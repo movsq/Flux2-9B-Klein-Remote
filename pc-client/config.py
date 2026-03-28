@@ -7,7 +7,7 @@ from pathlib import Path
 # shell / CI environment are still used normally.
 try:
     from dotenv import load_dotenv
-    _root_env = Path(__file__).parent.parent / ".env"
+    _root_env = Path(__file__).resolve().parent.parent / ".env"
     load_dotenv(_root_env, override=False)  # shell env takes precedence
 except ImportError:
     pass  # dotenv not installed — rely on env vars set in the shell
