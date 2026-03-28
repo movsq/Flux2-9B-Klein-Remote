@@ -1,5 +1,8 @@
+import logging
 import os
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 # Load the shared root .env (projectroot/.env) so a single file configures
 # server, pc-client, and the Vite frontend all at once.
@@ -8,9 +11,10 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
     _root_env = Path(__file__).resolve().parent.parent / ".env"
-    load_dotenv(_root_env, override=False)  # shell env takes precedence
+    if not load_dotenv(_root_env, override=False):
+        _log.warning("Could not load .env at %s — using shell env / defaults", _root_env)
 except ImportError:
-    pass  # dotenv not installed — rely on env vars set in the shell
+    _log.warning("python-dotenv not installed — using shell env / defaults")
 
 # ── Deployment mode ────────────────────────────────────────────────────────────
 # "local"  → connect to ws://localhost:PORT  (for local dev)
@@ -32,6 +36,8 @@ elif _MODE == "remote":
     VPS_URL = f"wss://{_HOST}"
 else:  # local
     VPS_URL = f"ws://localhost:{_PORT}"
+
+_log.info("VPS_URL resolved to %s (DEPLOY_MODE=%s)", VPS_URL, _MODE)
 
 # The PIN that matches the PIN set on the server.
 PIN: str = os.environ.get("PIN", "changeme")
