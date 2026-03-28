@@ -16,7 +16,7 @@ services:
       - "443:443"
     environment:
       # Caddy uses FLUX_KLEIN_HOST as the site address in the Caddyfile ({$FLUX_KLEIN_HOST}).
-      - FLUX_KLEIN_HOST=${FLUX_KLEIN_HOST}
+      - FLUX_KLEIN_HOST=${FLUX_KLEIN_HOST:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Built Svelte frontend is served as static files by Caddy directly.
