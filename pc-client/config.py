@@ -14,10 +14,10 @@ except ImportError:
 
 # ── Deployment mode ────────────────────────────────────────────────────────────
 # "local"  → connect to ws://localhost:PORT  (for local dev)
-# "remote" → connect to wss://COMFYLINK_HOST  (for VPS / Tailscale)
+# "remote" → connect to wss://FLUX_KLEIN_HOST  (for VPS / Tailscale)
 _MODE: str = os.environ.get("DEPLOY_MODE", "local")
 _PORT: str = os.environ.get("PORT", "3000")
-_HOST: str = os.environ.get("COMFYLINK_HOST", "")
+_HOST: str = os.environ.get("FLUX_KLEIN_HOST", "")
 
 # VPS_URL can also be set directly to override the DEPLOY_MODE logic entirely.
 _VPS_URL_OVERRIDE: str = os.environ.get("VPS_URL", "")
@@ -27,7 +27,7 @@ if _VPS_URL_OVERRIDE:
 elif _MODE == "remote":
     if not _HOST:
         raise RuntimeError(
-            "COMFYLINK_HOST must be set in .env when DEPLOY_MODE=remote"
+            "FLUX_KLEIN_HOST must be set in .env when DEPLOY_MODE=remote"
         )
     VPS_URL = f"wss://{_HOST}"
 else:  # local

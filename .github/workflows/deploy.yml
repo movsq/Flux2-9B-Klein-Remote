@@ -6,7 +6,7 @@
 #   2. VPS_USER         — SSH username on the VPS (e.g. "root")
 #   3. SSH_PRIVATE_KEY  — Private SSH key authorised to log in to the VPS
 #   4. VPS_PATH         — Deployment directory on the VPS
-#                         (e.g. "/root/comfylink-server")
+#                         (e.g. "/root/flux2-9b-klein-remote")
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Deploy to VPS

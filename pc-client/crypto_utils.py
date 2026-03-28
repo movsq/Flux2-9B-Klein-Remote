@@ -72,7 +72,7 @@ def _derive_aes_key(private_key, peer_public_key: EllipticCurvePublicKey) -> byt
         algorithm=hashes.SHA256(),
         length=32,
         salt=bytes(32),                          # fixed zero salt — matches JS side
-        info=b"comfylink-v1",                    # matches JS side
+        info=b"flux2-klein-v1",                    # matches JS side
     )
     return hkdf.derive(shared_secret)
 

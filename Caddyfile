@@ -1,12 +1,12 @@
 # Flux2-9B-Klein-Remote — Caddy reverse proxy configuration.
 #
-# COMFYLINK_HOST is injected as an environment variable by docker-compose.
+# FLUX_KLEIN_HOST is injected as an environment variable by docker-compose.
 # Examples:
-#   Tailscale MagicDNS:  comfylink.tailXXXXX.ts.net  → add "tls internal" below
-#   Custom domain:       comfylink.example.com        → Caddy auto-provisions Let's Encrypt
+#   Tailscale MagicDNS:  flux2-klein.tailXXXXX.ts.net  → add "tls internal" below
+#   Custom domain:       flux2-klein.example.com        → Caddy auto-provisions Let's Encrypt
 #   Raw LAN IP:          192.168.1.100                → add "tls internal" below
 
-{$COMFYLINK_HOST} {
+{$FLUX_KLEIN_HOST} {
     # ── Uncomment for Tailscale or other private-CA networks ──────────────────
     # tls internal
 

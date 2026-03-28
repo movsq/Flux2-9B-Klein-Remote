@@ -9,7 +9,7 @@ Run with:
 
 Environment variables (or edit config.py):
     VPS_URL        — e.g. wss://yourdomain.com  (default: ws://localhost:3000)
-    DEGEN_PIN      — must match the PIN in server/.env
+    FLUX_KLEIN_PIN      — must match the PIN in server/.env
     PRIVATE_KEY_PATH / PUBLIC_KEY_PATH — paths to your keypair PEM files
 """
 

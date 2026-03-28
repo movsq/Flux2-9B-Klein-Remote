@@ -110,12 +110,12 @@ SSH into your VPS and run:
 apt update && apt install -y docker.io docker-compose-v2
 
 # Create the deployment directory
-mkdir -p /root/comfylink-server
+mkdir -p /root/flux2-9b-klein-remote
 
 # Create the VPS .env
-cat > /root/comfylink-server/.env << 'EOF'
+cat > /root/flux2-9b-klein-remote/.env << 'EOF'
 PIN=your-strong-random-pin-here
-COMFYLINK_HOST=your-hostname.example.com
+FLUX_KLEIN_HOST=your-hostname.example.com
 EOF
 ```
 
@@ -131,7 +131,7 @@ VPS, and restarts Docker.
 | `VPS_HOST` | SSH-reachable address of your VPS (IP or hostname) |
 | `VPS_USER` | SSH username (e.g. `root`) |
 | `SSH_PRIVATE_KEY` | Private SSH key authorised to log in to the VPS |
-| `VPS_PATH` | Deployment directory on the VPS (e.g. `/root/comfylink-server`) |
+| `VPS_PATH` | Deployment directory on the VPS (e.g. `/root/flux2-9b-klein-remote`) |
 
 Then push:
 
@@ -147,18 +147,18 @@ Watch progress in your repo's **Actions** tab.
 ```powershell
 # From project root
 cd client; npm run build; cd ..
-scp -r ./client/dist/* user@your-vps:/root/comfylink-server/client/dist/
-scp ./server/package.json user@your-vps:/root/comfylink-server/server/
-scp -r ./server/src user@your-vps:/root/comfylink-server/server/
-scp ./docker-compose.yml ./Caddyfile user@your-vps:/root/comfylink-server/
-ssh user@your-vps "cd /root/comfylink-server && docker compose up -d --build --force-recreate"
+scp -r ./client/dist/* user@your-vps:/root/flux2-9b-klein-remote/client/dist/
+scp ./server/package.json user@your-vps:/root/flux2-9b-klein-remote/server/
+scp -r ./server/src user@your-vps:/root/flux2-9b-klein-remote/server/
+scp ./docker-compose.yml ./Caddyfile user@your-vps:/root/flux2-9b-klein-remote/
+ssh user@your-vps "cd /root/flux2-9b-klein-remote && docker compose up -d --build --force-recreate"
 ```
 
 ### Tailscale (optional — private networking)
 
 1. Install Tailscale on VPS: `curl -fsSL https://tailscale.com/install.sh | sh && tailscale up --ssh`
 2. Enable **MagicDNS** + **HTTPS Certificates** in the [Tailscale admin console](https://login.tailscale.com/admin/dns)
-3. Set `COMFYLINK_HOST=your-machine.tailXXXXX.ts.net` in your VPS `.env`
+3. Set `FLUX_KLEIN_HOST=your-machine.tailXXXXX.ts.net` in your VPS `.env`
 4. Uncomment `tls internal` in `Caddyfile`
 5. Set `SKIP_TLS_VERIFY=true` in your local `.env` (so pc-client accepts the Tailscale cert)
 
@@ -171,8 +171,8 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PIN` | *(required)* | Shared secret used to authenticate the phone and PC to the relay |
-| `DEPLOY_MODE` | `local` | `local` (connect to localhost) or `remote` (connect to `COMFYLINK_HOST`) |
-| `COMFYLINK_HOST` | — | Hostname of the VPS serving the app (e.g. `comfylink.example.com`) |
+| `DEPLOY_MODE` | `local` | `local` (connect to localhost) or `remote` (connect to `FLUX_KLEIN_HOST`) |
+| `FLUX_KLEIN_HOST` | — | Hostname of the VPS serving the app (e.g. `flux2-klein.example.com`) |
 | `PORT` | `3000` | Port the Node.js relay listens on |
 | `SESSION_TTL_MS` | `86400000` | Phone session lifetime in ms (default: 24 h) |
 | `COMFYUI_URL` | `http://127.0.0.1:8188` | URL of the local ComfyUI instance |
@@ -182,7 +182,7 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | `RECONNECT_DELAY` | `5` | Seconds between reconnect attempts (pc-client) |
 | `VPS_USER` | `root` | SSH username for manual deployments |
 | `VPS_SSH_HOST` | — | SSH address of the VPS for manual deployments |
-| `VPS_PATH` | `/root/comfylink-server` | Deployment path for manual deployments |
+| `VPS_PATH` | `/root/flux2-9b-klein-remote` | Deployment path for manual deployments |
 
 ---
 
@@ -193,7 +193,7 @@ The relay is a **blind relay** — it cannot read job payloads or results.
 | Layer | Algorithm |
 |-------|-----------|
 | Key exchange | ECDH P-256 |
-| Key derivation | HKDF-SHA-256 (`info = "comfylink-v1"`) |
+| Key derivation | HKDF-SHA-256 (`info = "flux2-klein-v1"`) |
 | Symmetric encryption | AES-256-GCM |
 
 **Per-job forward secrecy:** The phone generates a fresh ephemeral keypair for every job.

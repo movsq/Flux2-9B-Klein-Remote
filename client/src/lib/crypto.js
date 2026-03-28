@@ -65,7 +65,7 @@ export async function deriveAESKey(ephPrivateKey, pcPublicKey) {
       name: 'HKDF',
       hash: 'SHA-256',
       salt: new Uint8Array(32), // fixed zero salt — fine for per-job ephemeral keys
-      info: new TextEncoder().encode('comfylink-v1'),
+      info: new TextEncoder().encode('flux2-klein-v1'),
     },
     hkdfKey,
     { name: 'AES-GCM', length: 256 },

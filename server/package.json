@@ -1,7 +1,7 @@
 {
   "name": "flux2-9b-klein-remote-server",
   "version": "1.0.0",
-  "description": "ComfyLink VPS relay server for E2E encrypted ComfyUI requests",
+  "description": "Flux2-9B-Klein-Remote VPS relay server for E2E encrypted ComfyUI requests",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
