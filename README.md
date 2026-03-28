@@ -53,14 +53,17 @@ This creates `private_key.pem` and `public_key.pem` inside `pc-client/`.
 
 ### 4. Load the ComfyUI workflow
 
-Open ComfyUI in your browser, click **Load**, and select:
+Load `ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json` into ComfyUI using any of these methods:
 
-```
-ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json
-```
+- **Drag and drop** the file directly onto the ComfyUI canvas.
+- **Menu:** click the ComfyUI logo in the top-left corner → **File → Open**, then select the file.
 
 See [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) for required model files and
 custom node packs.
+
+> **Port note:** the pc-client connects to ComfyUI at the URL set by `COMFYUI_URL` in your
+> `.env` (default `http://127.0.0.1:8188`). Make sure this port matches the one configured
+> in ComfyUI under **Settings → Server-Config → Port**.
 
 ### 5. Start everything
 
@@ -175,7 +178,7 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | `FLUX_KLEIN_HOST` | — | Hostname of the VPS serving the app (e.g. `flux2-klein.example.com`) |
 | `PORT` | `3000` | Port the Node.js relay listens on |
 | `SESSION_TTL_MS` | `86400000` | Phone session lifetime in ms (default: 24 h) |
-| `COMFYUI_URL` | `http://127.0.0.1:8188` | URL of the local ComfyUI instance |
+| `COMFYUI_URL` | `http://127.0.0.1:8188` | URL of the local ComfyUI instance — port must match **Settings → Server-Config → Port** in ComfyUI |
 | `SKIP_TLS_VERIFY` | `false` | Skip TLS verification (use only for Tailscale / self-signed certs) |
 | `PRIVATE_KEY_PATH` | `private_key.pem` | Path to the PC's private key (relative to `pc-client/`) |
 | `PUBLIC_KEY_PATH` | `public_key.pem` | Path to the PC's public key |
