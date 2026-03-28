@@ -25,7 +25,9 @@
     }
 
     # ── Frontend → static files built by Vite ─────────────────────────────────
-    root * /var/www/html
-    file_server
-    try_files {path} /index.html
+    handle {
+        root * /var/www/html
+        file_server
+        try_files {path} /index.html
+    }
 }
