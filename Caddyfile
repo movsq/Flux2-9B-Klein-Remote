@@ -6,7 +6,7 @@
 #   Custom domain:       flux2-klein.example.com        → Caddy auto-provisions Let's Encrypt
 #   Raw LAN IP:          192.168.1.100                → add "tls internal" below
 
-{$FLUX_KLEIN_HOST} {
+{$FLUX_KLEIN_HOST:localhost} {
     # ── Uncomment for Tailscale or other private-CA networks ──────────────────
     # tls internal
 
