@@ -1,12 +1,26 @@
 # ComfyUI Workflow — Flux 2 Klein 9B GGUF (Online / Image-Edit)
 
-This folder is the **source of truth** for the ComfyUI workflow used by the
-Flux2-9B-Klein-Remote system. Load `Flux2_Klein_9B_GGUF_ONLINE.json` into
-ComfyUI's UI to view, inspect, or modify the full node graph.
+This folder contains the **visual workflow** for the Flux2-9B-Klein-Remote
+system. `Flux2_Klein_9B_GGUF_ONLINE.json` is a standard ComfyUI graph-format
+save file — you can load it into ComfyUI's UI to view, inspect, or modify the
+node graph.
 
-The Python client (`pc-client/comfyui.py`) drives this workflow via ComfyUI's
-HTTP/WebSocket API at runtime. The node IDs in the JSON must stay in sync with
-the IDs referenced in `comfyui.py`.
+### Two workflow formats
+
+| File | Format | Purpose |
+|------|--------|---------|
+| `ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json` | ComfyUI graph format (nodes, links, positions, UI metadata) | Visual reference — drag-and-drop into ComfyUI's canvas to inspect or edit |
+| `pc-client/workflow_template.json` | ComfyUI **API format** (keyed by node ID, with `inputs` / `class_type`) | What the pc-client actually submits to ComfyUI's `/prompt` endpoint at runtime |
+
+The Python client (`pc-client/comfyui.py`) loads `workflow_template.json` at
+startup, deep-copies it per job, injects the job parameters (prompt, images,
+seed, steps, sampler), prunes unused nodes based on image count, then POSTs
+the result to ComfyUI's HTTP API. **It does not read or use the visual
+workflow JSON in this folder.**
+
+If you modify the visual workflow (add/remove/renumber nodes), you must
+re-export the API format and update `pc-client/workflow_template.json` to
+match — and update the node IDs referenced in `pc-client/comfyui.py`.
 
 ---
 
@@ -14,13 +28,15 @@ the IDs referenced in `comfyui.py`.
 
 | Mode | Inputs | Behaviour |
 |------|--------|-----------|
-| Text-only | Prompt | Generates a new image from scratch |
+| Text-only | Prompt | Generates a new image from scratch (latent hardcoded to 1024×1024) |
 | Image + Prompt | Image 1 + Prompt | Edits / re-imagines Image 1 |
 | Multi-image + Prompt | Image 1 + Image 2 + Prompt | Composites Image 2 into the scene from Image 1 |
 
-Images are scaled to ~1 megapixel (configurable) before being fed to the model.
-A side-by-side comparison of the input and output is shown in the ComfyUI UI via
-the `Image Comparer (rgthree)` node.
+Images are uploaded to ComfyUI's input directory via `POST /upload/image`,
+then referenced by filename in the native `LoadImage` nodes (177 / 178). They
+are scaled to ~1 megapixel before being fed to the model. A side-by-side
+comparison of the input and output is shown in ComfyUI's UI via the
+`Image Comparer (rgthree)` node.
 
 ---
 
@@ -51,7 +67,6 @@ Install these via **ComfyUI Manager** (search by name) or clone directly.
 | **ComfyUi-Scale-Image-to-Total-Pixels-Advanced** (BigStationW) | `ImageScaleToTotalPixelsX` | [BigStationW/ComfyUi-Scale-Image-to-Total-Pixels-Advanced](https://github.com/BigStationW/ComfyUi-Scale-Image-to-Total-Pixels-Advanced) |
 | **Comfyui-AD-Image-Concatenation-Advanced** (BigStationW) | `AD_image-concat-advanced` | [BigStationW/Comfyui-AD-Image-Concatenation-Advanced](https://github.com/BigStationW/Comfyui-AD-Image-Concatenation-Advanced) |
 | **rgthree-comfy** | `Image Comparer` | [rgthree/rgthree-comfy](https://github.com/rgthree/rgthree-comfy) |
-| **ComfyUI-Easy-Use** (ltdrdata) | `easy loadImageBase64` | [ltdrdata/ComfyUI-Easy-Use](https://github.com/ltdrdata/ComfyUI-Easy-Use) |
 
 ---
 
@@ -67,26 +82,36 @@ Install these via **ComfyUI Manager** (search by name) or clone directly.
 | 106 | `EmptyFlux2LatentImage` | Creates blank latent (size driven by Image 1) |
 | 109 | `Flux2Scheduler` | Sigma schedule (steps, size-aware) |
 | 115 | `ImageScaleToTotalPixelsX` | Scales Image 1 to ~1 MP |
-| 117 | `PreviewImage` | Output preview |
-| 118 | `PreviewImage` | Composited debug preview |
-| 119 | `Image Comparer (rgthree)` | Side-by-side input/output |
-| 133 | `ImageScaleToTotalPixelsX` | Scales Image 2 to ~1 MP |
+| 117 | `PreviewImage` | Output preview (pc-client reads result from this node) |
+| 118 | `PreviewImage` | Composited debug preview (2-image mode only) |
+| 119 | `Image Comparer (rgthree)` | Side-by-side input/output (1- and 2-image modes) |
+| 133 | `ImageScaleToTotalPixelsX` | Scales Image 2 to ~1 MP (2-image mode only) |
 | 139 | `BasicGuider` | Guidance combiner |
 | 156 | `TextEncodeEditAdvanced` | Prompt + image-reference encoding |
-| 159 | `AD_image-concat-advanced` | Vertically concatenates Image 1 + Image 2 |
-| 161 | `AD_image-concat-advanced` | Horizontally concatenates inputs + output |
+| 159 | `AD_image-concat-advanced` | Vertically concatenates Image 1 + Image 2 (2-image mode only) |
+| 161 | `AD_image-concat-advanced` | Horizontally concatenates inputs + output (2-image mode only) |
 | 163 | `LoaderGGUFAdvanced` | Loads `flux-2-klein-9b-Q4_K_M.gguf` |
 | 164 | `ClipLoaderGGUF` | Loads `qwen3-8b-q4_k_m.gguf` CLIP |
-| 175 | `easy loadImageBase64` | Image 1 input (base64) |
-| 176 | `easy loadImageBase64` | Image 2 input (base64) |
+| 177 | `LoadImage` | Image 1 input (filename set at runtime) |
+| 178 | `LoadImage` | Image 2 input (filename set at runtime, 2-image mode only) |
+
+### Node pruning by image count
+
+`comfyui.py` dynamically removes nodes that aren't needed:
+
+| Mode | Nodes removed |
+|------|---------------|
+| 2 images | *(none)* |
+| 1 image | 178, 133, 159, 161, 118 |
+| 0 images (text-only) | 177, 178, 133, 115, 159, 161, 118, 119 |
 
 ---
 
 ## Customising the Workflow
 
-To change the default prompt, steps, or sampler, edit the widget values of the
-corresponding nodes in ComfyUI's UI and re-save the JSON, **or** override them
-programmatically via the `pc-client/comfyui.py` parameter injection.
-
-If you add, remove, or renumber nodes, update the node ID constants at the top
-of `pc-client/comfyui.py` accordingly.
+1. Open `Flux2_Klein_9B_GGUF_ONLINE.json` in ComfyUI's visual editor.
+2. Make your changes (add/remove nodes, change defaults, etc.).
+3. Export the API format: **Menu → Save (API Format)** — or use *Developer Mode*
+   to copy the API JSON.
+4. Replace `pc-client/workflow_template.json` with the new API-format export.
+5. Update any changed node IDs in `pc-client/comfyui.py`.

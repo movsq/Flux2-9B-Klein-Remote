@@ -51,15 +51,21 @@ python keygen.py
 This creates `private_key.pem` and `public_key.pem` inside `pc-client/`.
 **Back up `private_key.pem`** — losing it means the phone can no longer decrypt job results.
 
-### 4. Load the ComfyUI workflow
+### 4. Install ComfyUI models and custom nodes
 
-Load `ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json` into ComfyUI using any of these methods:
+The pc-client submits workflows directly to ComfyUI's API — you don't need to
+load anything into ComfyUI's UI. But you **do** need the required models and
+custom node packs installed.
 
-- **Drag and drop** the file directly onto the ComfyUI canvas.
-- **Menu:** click the ComfyUI logo in the top-left corner → **File → Open**, then select the file.
+See [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) for:
 
-See [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) for required model files and
-custom node packs.
+- Required model files and where to download them
+- Required custom node packs (installable via ComfyUI Manager)
+
+> **Optional:** Load `ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json` into
+> ComfyUI's visual editor (drag and drop onto the canvas) to inspect or tweak
+> the node graph. This is for reference only — the pc-client uses the separate
+> API-format template at `pc-client/workflow_template.json`.
 
 > **Port note:** the pc-client connects to ComfyUI at the URL set by `COMFYUI_URL` in your
 > `.env` (default `http://127.0.0.1:8188`). Make sure this port matches the one configured
@@ -83,19 +89,27 @@ and start generating.
 
 ---
 
-## ComfyUI Workflow
+## How It Works
 
-The full ComfyUI workflow lives in [`ComfyUI-Workflow/`](ComfyUI-Workflow/). Load
-`Flux2_Klein_9B_GGUF_ONLINE.json` into ComfyUI's UI to view or customise the node graph.
+### Workflow architecture
 
-The Python client (`pc-client/comfyui.py`) drives this workflow via ComfyUI's HTTP/WebSocket
-API at runtime.
+The ComfyUI workflow exists in two formats:
 
-See [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) for:
+| File | Format | Purpose |
+|------|--------|---------|
+| `ComfyUI-Workflow/Flux2_Klein_9B_GGUF_ONLINE.json` | ComfyUI graph format | Visual reference for the ComfyUI editor (nodes, links, positions, UI metadata) |
+| `pc-client/workflow_template.json` | ComfyUI API format | Template submitted to ComfyUI's `/prompt` endpoint at runtime |
 
-- Required model files and where to download them
-- Required custom node packs (installable via ComfyUI Manager)
-- How to customise the workflow
+At runtime, the pc-client:
+1. Loads `workflow_template.json` once at startup
+2. Deep-copies it per job, injecting the job parameters (prompt, seed, steps, sampler)
+3. Uploads images to ComfyUI via `POST /upload/image` and patches their filenames into the `LoadImage` nodes
+4. Prunes unused nodes based on image count (0, 1, or 2 images)
+5. POSTs the assembled workflow to ComfyUI's `/prompt` API
+6. Monitors progress via ComfyUI's WebSocket, then downloads the output image from `/history`
+
+See [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) for the full node map and
+customisation instructions.
 
 ---
 
@@ -211,15 +225,21 @@ decrypts.
 
 | Direction | Message |
 |-----------|---------|
-| Phone → Server | `{ type: "submit", payload: "<b64>" }` |
-| Server → PC | `{ type: "job", jobId: "...", payload: "<b64>" }` |
-| PC → Server | `{ type: "result", jobId: "...", payload: "<b64>" }` |
-| Server → Phone | `{ type: "result", jobId: "...", payload: "<b64>" }` |
-| Server → Phone | `{ type: "queued", jobId: "..." }` |
-| Server → Phone | `{ type: "no_pc" }` — PC not connected |
-| PC → Server | `{ type: "pubkey", publicKey: "<b64 SPKI>" }` — once on connect |
 | PC → Server | `{ type: "auth", pin: "..." }` — first message |
 | Server → PC | `{ type: "auth_ok" }` |
+| PC → Server | `{ type: "pubkey", publicKey: "<b64 SPKI>" }` — once after auth |
+| Phone → Server | `{ type: "submit", payload: "<b64>" }` |
+| Server → Phone | `{ type: "queued", jobId: "..." }` |
+| Server → Phone | `{ type: "no_pc" }` — PC not connected |
+| Server → PC | `{ type: "job", jobId: "...", payload: "<b64>" }` |
+| PC → Server | `{ type: "progress", jobId: "...", value: N, max: M }` |
+| Server → Phone | `{ type: "progress", jobId: "...", value: N, max: M }` |
+| PC → Server | `{ type: "result", jobId: "...", payload: "<b64>" }` |
+| Server → Phone | `{ type: "result", jobId: "...", payload: "<b64>" }` |
+| PC → Server | `{ type: "error", jobId: "...", message: "..." }` |
+| Server → Phone | `{ type: "error", jobId: "...", message: "..." }` |
+| Phone → Server | `{ type: "cancel", jobId: "..." }` |
+| Server → PC | `{ type: "cancel", jobId: "..." }` |
 
 ---
 
@@ -232,13 +252,20 @@ Flux2-9B-Klein-Remote/
 │   └── workflows/
 │       └── deploy.yml           ← GitHub Actions: auto-deploy on push to main
 ├── ComfyUI-Workflow/
-│   ├── Flux2_Klein_9B_GGUF_ONLINE.json   ← load this into ComfyUI
-│   └── README.md                ← required models + custom nodes
+│   ├── Flux2_Klein_9B_GGUF_ONLINE.json   ← visual workflow (for ComfyUI editor)
+│   └── README.md                ← required models, custom nodes, node map
 ├── Caddyfile                    ← reverse proxy / TLS config
 ├── docker-compose.yml           ← VPS orchestration (server + Caddy)
 ├── client/                      ← Svelte frontend (phone-facing)
 ├── server/                      ← Node.js/Express relay + WebSocket broker
-└── pc-client/                   ← Python client — runs on your PC
+└── pc-client/
+    ├── main.py                  ← WebSocket client — connects to relay
+    ├── comfyui.py               ← builds workflow, submits to ComfyUI API
+    ├── workflow_template.json   ← API-format workflow template (submitted to ComfyUI)
+    ├── crypto_utils.py          ← ECDH / AES-GCM decrypt/encrypt
+    ├── keygen.py                ← generates keypair (run once)
+    ├── config.py                ← reads .env, exports settings
+    └── requirements.txt
 ```
 
 ---
