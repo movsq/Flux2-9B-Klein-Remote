@@ -12,14 +12,15 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let token = $state(null);
   let ws = $state(null);
-  let view = $state('login');        // 'login' | 'submit' | 'result'
+  let view = $state('login');        // 'login' | 'submit'
   let currentAesKey = $state(null);
   let currentResult = $state(null);
   let wsError = $state('');
+  let showModal = $state(false);
 
-  // Seed + mode are owned here so they survive the submit → result → submit cycle
+  // Seed + mode are owned here so they survive cycles
   let seed = $state(randomSeed());
-  let seedMode = $state('randomize'); // 'randomize' | 'fixed' | 'increment' | 'decrement'
+  let seedMode = $state('randomize');
 
   // ── Login ──────────────────────────────────────────────────────────────────
   function handleLogin(newToken) {
@@ -34,7 +35,7 @@
 
     ws.on('result', (msg) => {
       currentResult = msg;
-      view = 'result';
+      showModal = true;
     });
 
     ws.on('error', ({ message }) => {
@@ -54,23 +55,26 @@
     });
   }
 
-  // ── Submit → Result ────────────────────────────────────────────────────────
+  // ── Submit ─────────────────────────────────────────────────────────────────
   function handleJobSubmitted({ aesKey }) {
     currentAesKey = aesKey;
   }
 
-  // ── Result → Submit ────────────────────────────────────────────────────────
+  // ── Modal close (keeps result for Preview button) ──────────────────────────
+  function handleClose() {
+    showModal = false;
+  }
+
+  // ── New Job (clears result entirely) ──────────────────────────────────────
   function handleDone() {
-    // Apply seed mode before returning to submit view
     if (seedMode === 'randomize') seed = randomSeed();
     else if (seedMode === 'increment') seed = seed + 1;
     else if (seedMode === 'decrement') seed = seed - 1;
-    // 'fixed': seed stays the same
 
     currentResult = null;
     currentAesKey = null;
     wsError = '';
-    view = 'submit';
+    showModal = false;
   }
 
   onDestroy(() => ws?.close());
@@ -83,10 +87,19 @@
 
   {#if view === 'login'}
     <Login onLogin={handleLogin} />
-  {:else if view === 'submit' || (view === 'result' && !currentResult)}
-    <Submit {token} {ws} onJobSubmitted={handleJobSubmitted} bind:seed bind:seedMode />
-  {:else if view === 'result' && currentResult}
-    <Result result={currentResult} aesKey={currentAesKey} onDone={handleDone} />
+  {:else if view === 'submit'}
+    <Submit
+      {token} {ws}
+      onJobSubmitted={handleJobSubmitted}
+      bind:seed bind:seedMode
+      previewResult={currentResult}
+      onPreview={() => showModal = true}
+      onNewJob={handleDone}
+    />
+  {/if}
+
+  {#if showModal && currentResult}
+    <Result result={currentResult} aesKey={currentAesKey} onDone={handleDone} onClose={handleClose} />
   {/if}
 </div>
 
@@ -95,23 +108,35 @@
     box-sizing: border-box;
   }
 
+  :global(html, body) {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
   :global(body) {
     margin: 0;
-    font-family: system-ui, -apple-system, sans-serif;
-    background: #0f0f0f;
-    color: #e5e5e5;
+    font-family: 'Syne', system-ui, sans-serif;
+    background: #09090b;
+    background-image:
+      linear-gradient(rgba(123, 156, 191, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(123, 156, 191, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    color: #e4e4e7;
     -webkit-font-smoothing: antialiased;
   }
 
   .app {
     min-height: 100dvh;
+    touch-action: pan-y;
   }
 
   .ws-banner {
-    background: #1f1f1f;
-    border-bottom: 1px solid #333;
-    color: #f59e0b;
-    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: #c4996a;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
     padding: 0.5rem 1rem;
     text-align: center;
   }

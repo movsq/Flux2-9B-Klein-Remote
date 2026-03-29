@@ -1,10 +1,7 @@
 <script>
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
 
-  let { result, aesKey, onDone } = $props();
-
-  // result: { jobId, payload } — payload is base64 (iv + ciphertext)
-  // aesKey: the AES-256-GCM CryptoKey derived during Submit
+  let { result, aesKey, onDone, onClose } = $props();
 
   let imageUrl = $state(null);
   let decryptError = $state('');
@@ -21,8 +18,6 @@
     try {
       const { iv, ciphertext } = decodeResultPayload(result.payload);
       const plaintext = await decryptPayload(aesKey, iv, ciphertext);
-
-      // Plaintext is raw image bytes (PNG/JPEG/WebP — whatever ComfyUI outputs)
       const blob = new Blob([plaintext], { type: 'image/png' });
       imageUrl = URL.createObjectURL(blob);
     } catch (err) {
@@ -33,53 +28,124 @@
   }
 </script>
 
-<div class="result-wrapper">
-  <h2>Result</h2>
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
+<div class="backdrop" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+  <div class="modal">
+    <button class="close-btn" onclick={onClose} aria-label="Close">✕</button>
 
-  {#if decrypting}
-    <p class="status">Decrypting…</p>
-  {:else if decryptError}
-    <p class="error">{decryptError}</p>
-  {:else if imageUrl}
-    <img src={imageUrl} alt="Generated result" class="result-image" />
-    <div class="actions">
-      <a href={imageUrl} download="result.png" class="btn-download">Download</a>
-      <button onclick={onDone} class="btn-new">New Job</button>
-    </div>
-  {/if}
+    <span class="modal-label">RESULT</span>
+
+    {#if decrypting}
+      <p class="status">DECRYPTING…</p>
+    {:else if decryptError}
+      <p class="error">{decryptError}</p>
+    {:else if imageUrl}
+      <img src={imageUrl} alt="Generated result" class="result-image" />
+      <div class="actions">
+        <a href={imageUrl} download="result.png" class="btn btn-accent">Download</a>
+        <button onclick={onDone} class="btn btn-ghost">New Job</button>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .result-wrapper {
-    padding: 1.25rem;
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    animation: fade-in 0.18s ease;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .modal {
+    position: relative;
+    width: 100%;
     max-width: 480px;
-    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem;
+    padding: 1.75rem;
+    backdrop-filter: blur(24px);
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    animation: slide-up 0.26s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  h2 {
-    margin: 0;
-    color: #fff;
-    font-size: 1.25rem;
+  @keyframes slide-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: #71717a;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+    line-height: 1;
+  }
+
+  .close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e4e4e7;
+  }
+
+  .close-btn:active {
+    transform: scale(0.88);
+    filter: brightness(0.85);
+  }
+
+  .modal-label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: #7b9cbf;
+    font-weight: 400;
   }
 
   .status {
-    color: #a78bfa;
+    font-family: 'DM Mono', monospace;
+    color: #7b9cbf;
+    font-size: 0.8rem;
     margin: 0;
+    letter-spacing: 0.08em;
   }
 
   .error {
-    color: #f87171;
-    font-size: 0.875rem;
+    font-family: 'DM Mono', monospace;
+    color: #c47070;
+    font-size: 0.78rem;
     margin: 0;
   }
 
   .result-image {
     width: 100%;
-    border-radius: 12px;
-    border: 1px solid #333;
+    border-radius: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: block;
   }
 
   .actions {
@@ -87,34 +153,45 @@
     gap: 0.75rem;
   }
 
-  .btn-download,
-  .btn-new {
+  .btn {
     flex: 1;
     padding: 0.75rem;
     border: none;
-    border-radius: 8px;
-    font-size: 0.95rem;
+    border-radius: 3rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
     cursor: pointer;
     text-align: center;
     text-decoration: none;
-    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
   }
 
-  .btn-download {
-    background: #7c3aed;
-    color: #fff;
+  .btn:active {
+    transform: scale(0.95);
+    filter: brightness(0.85);
   }
 
-  .btn-download:hover {
-    background: #6d28d9;
+  .btn-accent {
+    background: #7b9cbf;
+    color: #09090b;
   }
 
-  .btn-new {
-    background: #333;
-    color: #fff;
+  .btn-accent:hover {
+    background: #a3bdd4;
   }
 
-  .btn-new:hover {
-    background: #444;
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.06);
+    color: #a1a1aa;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e4e4e7;
   }
 </style>

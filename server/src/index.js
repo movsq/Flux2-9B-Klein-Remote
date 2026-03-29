@@ -223,6 +223,10 @@ function handlePhoneSocket(ws) {
 
     if (msg.type === 'submit') {
       handleJobSubmit(ws, msg);
+    } else if (msg.type === 'cancel') {
+      if (pcSocket && pcSocket.readyState === 1) {
+        sendJson(pcSocket, { type: 'cancel', jobId: msg.jobId });
+      }
     } else {
       sendJson(ws, { type: 'error', message: `Unknown message type: ${msg.type}` });
     }

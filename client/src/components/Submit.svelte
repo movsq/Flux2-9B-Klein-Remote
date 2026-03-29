@@ -9,10 +9,9 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  // seed + seedMode are $bindable so App.svelte owns and persists them
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable() } = $props();
+  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob } = $props();
 
-  // ── Per-form local state ────────────────────────────────────────────────────
+  // ── Per-form local state ──────────────────────────────────────────────
   let imageFile1 = $state(null);
   let imagePreviewUrl1 = $state(null);
   let imageFile2 = $state(null);
@@ -23,25 +22,47 @@
   let status = $state('idle'); // 'idle' | 'encrypting' | 'sent' | 'error'
   let error = $state('');
 
-  // ── Progress state ──────────────────────────────────────────────────────────
-  const SEGMENTS = 16;
+  // ── Dropdown open state ───────────────────────────────────────────────
+  let seedModeOpen = $state(false);
+  let samplerOpen = $state(false);
+
+  const seedModeOptions = [
+    { value: 'randomize', label: 'Randomize' },
+    { value: 'fixed', label: 'Fixed' },
+    { value: 'increment', label: 'Increment +1' },
+    { value: 'decrement', label: 'Decrement -1' },
+  ];
+  const samplerOptions = [
+    { value: 'euler', label: 'Euler' },
+    { value: 'res_multistep', label: 'Res Multistep' },
+    { value: 'heun', label: 'Heun' },
+  ];
+
+  let seedModeLabel = $derived(seedModeOptions.find(o => o.value === seedMode)?.label ?? seedMode);
+  let samplerLabel = $derived(samplerOptions.find(o => o.value === sampler)?.label ?? sampler);
+
+  // Click-outside action for dropdowns
+  function clickOutside(node, callback) {
+    const handle = (e) => { if (!node.contains(e.target)) callback(); };
+    document.addEventListener('pointerdown', handle, true);
+    return { destroy() { document.removeEventListener('pointerdown', handle, true); } };
+  }
+
+  // ── Progress state ────────────────────────────────────────────────────
   let progressValue = $state(0);
   let progressMax   = $state(1);
-  let progressPhase = $state(1); // increments each time a sampler resets
-  let _prevValue    = 0;         // internal — not reactive
+  let progressPhase = $state(1);
+  let _prevValue    = 0;
 
   $effect(() => {
     if (!ws) return;
     const off = ws.on('progress', ({ value, max }) => {
-      // Detect a new sampling phase: value dropped after reaching near-completion
-      if (value < _prevValue && _prevValue >= progressMax * 0.9) {
-        progressPhase += 1;
-      }
+      if (value < _prevValue && _prevValue >= progressMax * 0.9) progressPhase += 1;
       _prevValue    = value;
       progressValue = value;
       progressMax   = max > 0 ? max : 1;
     });
-    return off; // cleanup when ws changes or component unmounts
+    return off;
   });
 
   function resetProgress() {
@@ -51,11 +72,19 @@
     _prevValue    = 0;
   }
 
-  let phaseName = $derived(progressPhase === 1 ? 'SAMPLING' : progressPhase === 2 ? 'REFINING' : `PASS ${progressPhase}`);
   let pct = $derived(progressMax > 0 ? Math.round((progressValue / progressMax) * 100) : 0);
-  let litCount = $derived(Math.round((progressValue / progressMax) * SEGMENTS));
 
-  // ── Image slot helpers ──────────────────────────────────────────────────────
+  // ── Auto-reset when App clears the result (New Job from modal) ────────
+  let _hadResult = false;
+  $effect(() => {
+    if (previewResult) { _hadResult = true; }
+    if (!previewResult && _hadResult && status === 'sent') {
+      reset();
+      _hadResult = false;
+    }
+  });
+
+  // ── Image helpers ─────────────────────────────────────────────────────
   function handleFileChange1(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -64,7 +93,6 @@
     imagePreviewUrl1 = URL.createObjectURL(file);
     e.target.value = '';
   }
-
   function handleFileChange2(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -73,20 +101,15 @@
     imagePreviewUrl2 = URL.createObjectURL(file);
     e.target.value = '';
   }
-
   function clearImage1() {
     if (imagePreviewUrl1) URL.revokeObjectURL(imagePreviewUrl1);
-    imageFile1 = null;
-    imagePreviewUrl1 = null;
+    imageFile1 = null; imagePreviewUrl1 = null;
   }
-
   function clearImage2() {
     if (imagePreviewUrl2) URL.revokeObjectURL(imagePreviewUrl2);
-    imageFile2 = null;
-    imagePreviewUrl2 = null;
+    imageFile2 = null; imagePreviewUrl2 = null;
   }
 
-  // Avoids spread-operator stack overflow on large files
   async function fileToBase64(file) {
     if (!file) return null;
     const buf = await file.arrayBuffer();
@@ -96,52 +119,25 @@
     return btoa(binary);
   }
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || status === 'sent') return;
     error = '';
     status = 'encrypting';
-
     try {
-      // 1. Fetch PC's public key
-      const pcPubKeyB64 = await getPCPublicKey(token);
-      const pcPublicKey = await importPcPublicKey(pcPubKeyB64);
-
-      // 2. Generate per-job ephemeral keypair
-      const ephKeyPair = await generateEphemeralKeyPair();
-
-      // 3. Derive shared AES key via ECDH + HKDF
-      const aesKey = await deriveAESKey(ephKeyPair.privateKey, pcPublicKey);
-
-      // 4. Build plaintext: JSON with prompt, both images (null if not selected),
-      //    and generation parameters
-      const image1B64 = await fileToBase64(imageFile1);
-      const image2B64 = await fileToBase64(imageFile2);
-      const plaintext = new TextEncoder().encode(
-        JSON.stringify({
-          prompt: prompt.trim(),
-          image1: image1B64,
-          image2: image2B64,
-          seed,
-          steps,
-          sampler,
-        }),
-      );
-
-      // 5. Encrypt
+      const pcPubKeyB64  = await getPCPublicKey(token);
+      const pcPublicKey  = await importPcPublicKey(pcPubKeyB64);
+      const ephKeyPair   = await generateEphemeralKeyPair();
+      const aesKey       = await deriveAESKey(ephKeyPair.privateKey, pcPublicKey);
+      const image1B64    = await fileToBase64(imageFile1);
+      const image2B64    = await fileToBase64(imageFile2);
+      const plaintext    = new TextEncoder().encode(JSON.stringify({ prompt: prompt.trim(), image1: image1B64, image2: image2B64, seed, steps, sampler }));
       const { iv, ciphertext } = await encryptPayload(aesKey, plaintext);
-
-      // 6. Export ephemeral public key so PC can derive the same AES key
       const ephPubKeyBytes = await exportEphemeralPublicKey(ephKeyPair.publicKey);
-
-      // 7. Pack into wire format
       const payload = encodeJobPayload(ephPubKeyBytes, iv, ciphertext);
-
-      // 8. Send via WebSocket relay
       const sent = ws.send({ type: 'submit', payload });
       if (!sent) throw new Error('WebSocket is not connected');
-
       status = 'sent';
       onJobSubmitted({ aesKey });
     } catch (err) {
@@ -150,130 +146,113 @@
     }
   }
 
+  function handleCancel() {
+    ws.send({ type: 'cancel' });
+    reset();
+  }
+
   function reset() {
-    clearImage1();
-    clearImage2();
-    prompt = '';
     status = 'idle';
     error = '';
     resetProgress();
-    // seed/seedMode/steps/sampler persist intentionally
   }
 </script>
 
-<div class="submit-wrapper">
-  {#if status === 'sent'}
-    <div class="sent-state">
-      <!-- ── System status header ─────────────────────────────────────── -->
-      <div class="telemetry-header">
-        <span class="sys-label">SYSTEM STATUS</span>
-        {#if progressValue > 0}
-          <span class="telemetry-tag">[ {phaseName}: {pct}% ]</span>
-        {:else}
-          <span class="telemetry-tag">[ QUEUED ]</span>
-        {/if}
+<div class="page">
+  <div class="card">
+    <form onsubmit={handleSubmit} class="form">
+      <div class="form-header">
+        <span class="form-title">ComfyLink</span>
+        <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
       </div>
 
-      <!-- ── Segmented progress bar ──────────────────────────────────── -->
-      <div class="seg-bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
-        {#each { length: SEGMENTS } as _, i}
-          <div class="seg" class:seg-on={i < litCount}></div>
-        {/each}
-      </div>
-
-      <button onclick={reset} class="btn-secondary">Submit another</button>
-    </div>
-  {:else}
-    <form onsubmit={handleSubmit} class="submit-form">
-      <h2>New Job</h2>
-
-      <!-- ── Image slots ─────────────────────────────────────────────────── -->
+      <!-- Images -->
       <div class="img-slots">
-        <!-- Image 1 -->
         <div class="img-slot">
-          <span class="slot-title">Image 1</span>
+          <span class="field-label">IMAGE 1</span>
           <label class="img-label">
             {#if imagePreviewUrl1}
-              <img src={imagePreviewUrl1} alt="Slot 1 preview" class="preview" />
+              <img src={imagePreviewUrl1} alt="Slot 1 preview" class="img-preview" />
             {:else}
-              <div class="drop-zone">
-                <span>Tap to select</span>
-              </div>
+              <div class="drop-zone">+ SELECT</div>
             {/if}
-            <input
-              type="file"
-              accept="image/*"
-              onchange={handleFileChange1}
-              class="hidden-input"
-              disabled={status === 'encrypting'}
-            />
+            <input type="file" accept="image/*" onchange={handleFileChange1} class="hidden-input" />
           </label>
           {#if imageFile1}
-            <button type="button" class="btn-clear" onclick={clearImage1}>✕ Remove</button>
+            <button type="button" class="btn-clear" onclick={clearImage1}>&times; Remove</button>
           {/if}
         </div>
 
-        <!-- Image 2 -->
         <div class="img-slot">
-          <span class="slot-title">Image 2</span>
+          <span class="field-label">IMAGE 2</span>
           <label class="img-label">
             {#if imagePreviewUrl2}
-              <img src={imagePreviewUrl2} alt="Slot 2 preview" class="preview" />
+              <img src={imagePreviewUrl2} alt="Slot 2 preview" class="img-preview" />
             {:else}
-              <div class="drop-zone">
-                <span>Tap to select</span>
-              </div>
+              <div class="drop-zone">+ SELECT</div>
             {/if}
-            <input
-              type="file"
-              accept="image/*"
-              onchange={handleFileChange2}
-              class="hidden-input"
-              disabled={status === 'encrypting'}
-            />
+            <input type="file" accept="image/*" onchange={handleFileChange2} class="hidden-input" />
           </label>
           {#if imageFile2}
-            <button type="button" class="btn-clear" onclick={clearImage2}>✕ Remove</button>
+            <button type="button" class="btn-clear" onclick={clearImage2}>&times; Remove</button>
           {/if}
         </div>
       </div>
 
-      <!-- ── Prompt ─────────────────────────────────────────────────────── -->
-      <textarea
-        placeholder="Prompt…"
-        bind:value={prompt}
-        rows="4"
-        disabled={status === 'encrypting'}
-      ></textarea>
+      <!-- Prompt -->
+      <div class="field">
+        <label class="field-label" for="prompt-input">PROMPT</label>
+        <textarea
+          id="prompt-input"
+          placeholder="Describe your image..."
+          bind:value={prompt}
+          rows="4"
+          spellcheck="false"
+        ></textarea>
+      </div>
 
-      <!-- ── Seed + seed mode ───────────────────────────────────────────── -->
+      <!-- Seed + After generation -->
       <div class="param-row">
         <div class="param-field">
-          <label for="seed-input">Seed</label>
+          <label class="field-label" for="seed-input">SEED</label>
           <input
             id="seed-input"
             type="number"
             min="0"
             step="1"
             bind:value={seed}
-            disabled={status === 'encrypting'}
           />
         </div>
         <div class="param-field">
-          <label for="seed-mode">After generation</label>
-          <select id="seed-mode" bind:value={seedMode} disabled={status === 'encrypting'}>
-            <option value="randomize">Randomize</option>
-            <option value="fixed">Fixed</option>
-            <option value="increment">Increment (+1)</option>
-            <option value="decrement">Decrement (−1)</option>
-          </select>
+          <span class="field-label">AFTER GEN</span>
+          <div class="custom-select" use:clickOutside={() => seedModeOpen = false}>
+            <button
+              type="button"
+              class="select-trigger"
+              class:open={seedModeOpen}
+              onclick={() => seedModeOpen = !seedModeOpen}
+            >
+              <span>{seedModeLabel}</span>
+              <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </button>
+            <div class="select-list" class:visible={seedModeOpen}>
+              {#each seedModeOptions as opt}
+                <button
+                  type="button"
+                  class="select-option"
+                  class:active={seedMode === opt.value}
+                  onclick={() => { seedMode = opt.value; seedModeOpen = false; }}
+                >{opt.label}</button>
+              {/each}
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- ── Steps + sampler ───────────────────────────────────────────── -->
+      <!-- Steps + Sampler -->
       <div class="param-row">
         <div class="param-field">
-          <label for="steps-input">Steps (1–8)</label>
+          <label class="field-label" for="steps-input">STEPS (1-8)</label>
           <input
             id="steps-input"
             type="number"
@@ -281,16 +260,31 @@
             max="8"
             step="1"
             bind:value={steps}
-            disabled={status === 'encrypting'}
           />
         </div>
         <div class="param-field">
-          <label for="sampler-input">Sampler</label>
-          <select id="sampler-input" bind:value={sampler} disabled={status === 'encrypting'}>
-            <option value="euler">Euler</option>
-            <option value="res_multistep">Res Multistep</option>
-            <option value="heun">Heun</option>
-          </select>
+          <span class="field-label">SAMPLER</span>
+          <div class="custom-select" use:clickOutside={() => samplerOpen = false}>
+            <button
+              type="button"
+              class="select-trigger"
+              class:open={samplerOpen}
+              onclick={() => samplerOpen = !samplerOpen}
+            >
+              <span>{samplerLabel}</span>
+              <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </button>
+            <div class="select-list" class:visible={samplerOpen}>
+              {#each samplerOptions as opt}
+                <button
+                  type="button"
+                  class="select-option"
+                  class:active={sampler === opt.value}
+                  onclick={() => { sampler = opt.value; samplerOpen = false; }}
+                >{opt.label}</button>
+              {/each}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -298,33 +292,103 @@
         <p class="error">{error}</p>
       {/if}
 
-      <button type="submit" disabled={!prompt.trim() || status === 'encrypting'}>
-        {status === 'encrypting' ? 'Encrypting…' : 'Send'}
-      </button>
+      <!-- Generate row -->
+      <div class="generate-row">
+        {#if status === 'sent' && previewResult}
+          <button type="button" class="btn-generate view-result" onclick={onPreview}>
+            VIEW RESULT
+          </button>
+          <button type="button" class="btn-generate btn-new-job" onclick={onNewJob}>
+            NEW JOB
+          </button>
+        {:else if status === 'sent'}
+          <button
+            type="button"
+            class="btn-generate generating"
+            disabled
+            style:--progress="{pct}%"
+          >
+            GENERATING
+          </button>
+          <button type="button" class="btn-cancel-icon" onclick={handleCancel} aria-label="Cancel generation">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        {:else}
+          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting'}>
+            {status === 'encrypting' ? 'ENCRYPTING...' : 'GENERATE'}
+          </button>
+        {/if}
+      </div>
     </form>
-  {/if}
+  </div>
 </div>
 
 <style>
-  .submit-wrapper {
-    padding: 1.25rem;
-    max-width: 480px;
-    margin: 0 auto;
+  /* ── Page shell ──────────────────────────────────────────────────────── */
+  .page {
+    min-height: 100dvh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1.25rem;
   }
 
-  .submit-form {
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.25rem;
+    padding: 1.75rem;
+    backdrop-filter: blur(12px);
+  }
+
+  /* ── Form ──────────────────────────────────────────────────────────── */
+  .form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.1rem;
   }
 
-  h2 {
-    margin: 0;
-    color: #fff;
-    font-size: 1.25rem;
+  .form-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-bottom: 0.2rem;
   }
 
-  /* ── Image slots ──────────────────────────────────────────────────────── */
+  .form-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #f4f4f5;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .form-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.2em;
+    color: #7b9cbf;
+  }
+
+  /* ── Field label ───────────────────────────────────────────────────── */
+  .field-label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    color: #52525b;
+    margin-bottom: 0.35rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Image slots ───────────────────────────────────────────────────── */
   .img-slots {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -334,86 +398,111 @@
   .img-slot {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .slot-title {
-    font-size: 0.78rem;
-    color: #888;
-    font-weight: 500;
-    letter-spacing: 0.03em;
   }
 
   .img-label {
     cursor: pointer;
     display: block;
+    touch-action: manipulation;
   }
 
   .drop-zone {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px dashed #333;
-    border-radius: 10px;
-    height: 130px;
-    color: #555;
-    font-size: 0.82rem;
-    transition: border-color 0.2s;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 0.75rem;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.02);
+    color: #3f3f46;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
   }
 
-  .drop-zone:hover {
-    border-color: #555;
+  .img-label:hover .drop-zone {
+    border-color: rgba(123, 156, 191, 0.4);
+    color: #7b9cbf;
+    background: rgba(123, 156, 191, 0.04);
   }
 
-  .preview {
+  .img-preview {
     width: 100%;
-    height: 130px;
+    height: 120px;
     object-fit: cover;
-    border-radius: 10px;
-    border: 1px solid #333;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     display: block;
   }
 
-  .hidden-input {
-    display: none;
-  }
+  .hidden-input { display: none; }
 
   .btn-clear {
-    padding: 0.3rem 0.6rem;
-    border: 1px solid #444;
-    border-radius: 6px;
+    margin-top: 0.3rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.375rem;
     background: transparent;
-    color: #888;
-    font-size: 0.75rem;
+    color: #52525b;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s;
     align-self: flex-start;
+    letter-spacing: 0.04em;
+    transition: color 0.2s, border-color 0.2s, transform 0.12s ease, filter 0.12s ease;
   }
 
-  .btn-clear:hover {
-    color: #f87171;
-    border-color: #f87171;
-  }
+  .btn-clear:hover { color: #c47070; border-color: rgba(196, 112, 112, 0.4); }
+  .btn-clear:active { transform: scale(0.93); filter: brightness(0.85); }
 
-  /* ── Prompt ───────────────────────────────────────────────────────────── */
-  textarea {
-    padding: 0.75rem 1rem;
-    border: 1px solid #333;
-    border-radius: 8px;
-    background: #1a1a1a;
-    color: #fff;
-    font-size: 0.95rem;
-    resize: vertical;
+  /* ── Inputs / textarea ──────────────────────────────────────────────── */
+  textarea,
+  input[type='number'] {
+    padding: 0.65rem 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e4e4e7;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
     outline: none;
-    font-family: inherit;
+    width: 100%;
     transition: border-color 0.2s;
   }
 
-  textarea:focus {
-    border-color: #666;
+  input[type='number'] {
+    -moz-appearance: textfield;
+    -webkit-appearance: textfield;
+    appearance: textfield;
   }
 
-  /* ── Parameter rows ───────────────────────────────────────────────────── */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  textarea {
+    resize: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    padding-top: 0.75rem;
+    padding-bottom: 1rem;
+    overflow: auto;
+  }
+
+  textarea::placeholder,
+  input::placeholder { color: #3f3f46; }
+
+  textarea:focus,
+  input[type='number']:focus { border-color: rgba(123, 156, 191, 0.4); }
+
+  textarea:disabled,
+  input:disabled { opacity: 0.45; }
+
+  /* ── Param row ──────────────────────────────────────────────────────── */
   .param-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -423,134 +512,172 @@
   .param-field {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
   }
 
-  .param-field label {
-    font-size: 0.78rem;
-    color: #888;
+  /* ── Custom dropdown ─────────────────────────────────────────────────── */
+  .custom-select { position: relative; }
+
+  .select-trigger {
+    width: 100%;
+    padding: 0.65rem 0.875rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    color: #e4e4e7;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    transition: border-color 0.2s, transform 0.12s ease, filter 0.12s ease;
+  }
+
+  .select-trigger:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.18); }
+  .select-trigger:active:not(:disabled) { transform: scale(0.98); filter: brightness(0.9); }
+  .select-trigger:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .chevron {
+    display: flex;
+    align-items: center;
+    color: #52525b;
+    transition: transform 0.22s ease;
+    flex-shrink: 0;
+  }
+
+  .select-trigger.open .chevron { transform: rotate(180deg); }
+
+  .select-list {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    background: rgba(12, 12, 15, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    z-index: 20;
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-height 0.22s ease, opacity 0.18s ease;
+    backdrop-filter: blur(20px);
+  }
+
+  .select-list.visible {
+    max-height: 14rem;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .select-option {
+    width: 100%;
+    padding: 0.6rem 0.875rem;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.1s ease;
+  }
+
+  .select-option:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+  .select-option:active { transform: scale(0.98); }
+  .select-option.active { color: #7b9cbf; }
+
+  /* ── Generate row ────────────────────────────────────────────────────── */
+  .generate-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.25rem;
+  }
+
+  .btn-generate {
+    flex: 1;
+    padding: 0.85rem;
+    border: none;
+    border-radius: 3rem;
+    background: #7b9cbf;
+    color: #09090b;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
     font-weight: 500;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.3s, flex 0.3s ease;
+  }
+
+  .btn-generate:hover:not(:disabled) { background: #a3bdd4; }
+  .btn-generate:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
+  .btn-generate:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  @keyframes generating-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  .btn-generate.generating {
+    background: linear-gradient(
+      to right,
+      rgba(123, 156, 191, 0.45) var(--progress, 0%),
+      rgba(123, 156, 191, 0.12) var(--progress, 0%)
+    );
+    color: #7b9cbf;
+    border: 1px solid rgba(123, 156, 191, 0.25);
+    opacity: 1;
+    animation: generating-pulse 2s ease-in-out infinite;
+  }
+
+  .btn-generate.view-result {
+    background: #7b9cbf;
+    color: #09090b;
+    cursor: pointer;
+  }
+
+  .btn-generate.view-result:hover { background: #a3bdd4; }
+  .btn-generate.view-result:active { transform: scale(0.96); filter: brightness(0.85); }
+
+  .btn-generate.btn-new-job {
+    background: rgba(255, 255, 255, 0.06);
+    color: #a1a1aa;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-generate.btn-new-job:hover { background: rgba(255, 255, 255, 0.11); color: #e4e4e7; }
+
+  .btn-cancel-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: #71717a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+  }
+
+  .btn-cancel-icon:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .btn-cancel-icon:active { transform: scale(0.88); filter: brightness(0.85); }
+
+  /* ── Error ──────────────────────────────────────────────────────────── */
+  .error {
+    font-family: 'DM Mono', monospace;
+    color: #c47070;
+    font-size: 0.75rem;
+    margin: 0;
     letter-spacing: 0.03em;
   }
 
-  .param-field input,
-  .param-field select {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #333;
-    border-radius: 8px;
-    background: #1a1a1a;
-    color: #fff;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.2s;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .param-field input:focus,
-  .param-field select:focus {
-    border-color: #666;
-  }
-
-  .param-field input:disabled,
-  .param-field select:disabled {
-    opacity: 0.5;
-  }
-
-  /* ── Submit button ────────────────────────────────────────────────────── */
-  button[type='submit'] {
-    padding: 0.75rem;
-    border: none;
-    border-radius: 8px;
-    background: #7c3aed;
-    color: #fff;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.2s, opacity 0.2s;
-  }
-
-  button[type='submit']:hover:not(:disabled) {
-    background: #6d28d9;
-  }
-
-  button[type='submit']:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* ── Misc ─────────────────────────────────────────────────────────────── */
-  .error {
-    color: #f87171;
-    font-size: 0.875rem;
-    margin: 0;
-  }
-
-  .sent-state {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-    padding-top: 1rem;
-  }
-
-  /* ── Telemetry header ─────────────────────────────────────────────────── */
-  .telemetry-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .sys-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #555;
-    text-transform: uppercase;
-  }
-
-  .telemetry-tag {
-    font-size: 0.78rem;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: 700;
-    color: #f97316;
-    letter-spacing: 0.06em;
-  }
-
-  /* ── Segmented bar ────────────────────────────────────────────────────── */
-  .seg-bar {
-    display: flex;
-    gap: 3px;
-    width: 100%;
-  }
-
-  .seg {
-    flex: 1;
-    height: 18px;
-    border-radius: 2px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .seg-on {
-    background: #f97316;
-    border-color: #fb923c;
-    box-shadow: 0 0 6px #f9731688;
-  }
-
-  .btn-secondary {
-    padding: 0.65rem 1.25rem;
-    border: none;
-    border-radius: 8px;
-    background: #333;
-    color: #fff;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-
-  .btn-secondary:hover {
-    background: #444;
+  /* ── Mobile font-size to prevent iOS zoom ───────────────────────────── */
+  @media (hover: none) and (pointer: coarse) {
+    input, textarea { font-size: 16px !important; }
   }
 </style>
