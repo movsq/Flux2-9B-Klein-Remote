@@ -46,8 +46,8 @@ Download these into the indicated ComfyUI model directories before running.
 
 | File | Directory | Download |
 |------|-----------|----------|
-| `flux-2-klein-9b-Q4_K_M.gguf` | `models/unet/` | [Hugging Face — Flux 2 Klein 9B GGUF](https://huggingface.co/city96/FLUX.2-Klein-gguf) |
-| `qwen3-8b-q4_k_m.gguf` | `models/clip/` | [Hugging Face — Qwen3 8B GGUF](https://huggingface.co/city96/qwen3-8b-gguf) |
+| `flux-2-klein-9b-Q4_K_M.gguf` | `models/unet/` | [Hugging Face — Flux 2 Klein 9B GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/blob/main/flux-2-klein-9b-Q4_K_M.gguf) |
+| `qwen3-8b-q4_k_m.gguf` | `models/clip/` | [Hugging Face — Qwen3 8B GGUF](https://huggingface.co/Aldaris/Qwen3-8B-Q4_K_M-GGUF/blob/main/qwen3-8b-q4_k_m.gguf) |
 | `flux2-vae.safetensors` | `models/vae/` | [Hugging Face — Flux 2 VAE](https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors) |
 
 > **VRAM requirement:** The Q4_K_M quant of Flux 2 Klein 9B runs comfortably
