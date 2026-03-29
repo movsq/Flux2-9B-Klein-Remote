@@ -21,6 +21,8 @@
   let sampler = $state('euler');
   let status = $state('idle'); // 'idle' | 'encrypting' | 'sent' | 'error'
   let error = $state('');
+  let currentJobId = $state(null);
+  let _timeoutId = null;
 
   // ── Dropdown open state ───────────────────────────────────────────────
   let seedModeOpen = $state(false);
@@ -56,13 +58,32 @@
 
   $effect(() => {
     if (!ws) return;
-    const off = ws.on('progress', ({ value, max }) => {
+    const offs = [];
+
+    offs.push(ws.on('progress', ({ value, max }) => {
       if (value < _prevValue && _prevValue >= progressMax * 0.9) progressPhase += 1;
       _prevValue    = value;
       progressValue = value;
       progressMax   = max > 0 ? max : 1;
-    });
-    return off;
+    }));
+
+    offs.push(ws.on('queued', ({ jobId }) => {
+      currentJobId = jobId;
+    }));
+
+    offs.push(ws.on('error', () => {
+      if (status === 'sent') reset();
+    }));
+
+    offs.push(ws.on('no_pc', () => {
+      if (status === 'sent') reset();
+    }));
+
+    offs.push(ws.on('close', () => {
+      if (status === 'sent') reset();
+    }));
+
+    return () => offs.forEach(off => off());
   });
 
   function resetProgress() {
@@ -140,6 +161,13 @@
       if (!sent) throw new Error('WebSocket is not connected');
       status = 'sent';
       onJobSubmitted({ aesKey });
+      clearTimeout(_timeoutId);
+      _timeoutId = setTimeout(() => {
+        if (status === 'sent') {
+          error = 'Generation timed out — please try again';
+          reset();
+        }
+      }, 120_000);
     } catch (err) {
       error = err.message;
       status = 'error';
@@ -147,13 +175,16 @@
   }
 
   function handleCancel() {
-    ws.send({ type: 'cancel' });
+    ws.send({ type: 'cancel', jobId: currentJobId });
     reset();
   }
 
   function reset() {
     status = 'idle';
     error = '';
+    currentJobId = null;
+    clearTimeout(_timeoutId);
+    _timeoutId = null;
     resetProgress();
   }
 </script>

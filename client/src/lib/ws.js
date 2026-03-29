@@ -16,6 +16,8 @@ export function createPhoneWS(token) {
   const listeners = {};
   let socket = null;
   let closed = false;
+  let failedAttempts = 0;
+  const MAX_RETRIES = 5;
 
   function on(event, handler) {
     if (!listeners[event]) listeners[event] = [];
@@ -35,6 +37,7 @@ export function createPhoneWS(token) {
     socket = new WebSocket(url);
 
     socket.addEventListener('open', () => {
+      failedAttempts = 0;
       emit('open', null);
     });
 
@@ -51,10 +54,16 @@ export function createPhoneWS(token) {
 
     socket.addEventListener('close', (event) => {
       emit('close', event);
-      if (!closed) {
-        // Auto-reconnect after 3 seconds
-        setTimeout(connect, 3000);
+      if (closed) return;
+      failedAttempts += 1;
+      if (failedAttempts >= MAX_RETRIES) {
+        console.warn(`[ws] ${MAX_RETRIES} reconnect attempts failed — giving up.`);
+        emit('reconnect_failed', null);
+        return;
       }
+      const delay = Math.min(3000 * 2 ** (failedAttempts - 1), 30000);
+      console.log(`[ws] Reconnecting in ${delay / 1000}s (attempt ${failedAttempts})…`);
+      setTimeout(connect, delay);
     });
 
     socket.addEventListener('error', (event) => {

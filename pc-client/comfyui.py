@@ -38,6 +38,19 @@ _TEMPLATE_PATH = Path(__file__).parent / "workflow_template.json"
 _WORKFLOW_TEMPLATE: dict = json.loads(_TEMPLATE_PATH.read_text())
 
 
+async def interrupt_comfyui() -> None:
+    """Send an interrupt request to ComfyUI to cancel the current generation."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{COMFYUI_URL}/interrupt") as resp:
+                if resp.status == 200:
+                    log.info("[comfyui] Interrupt sent successfully.")
+                else:
+                    log.warning(f"[comfyui] Interrupt returned HTTP {resp.status}")
+    except Exception as exc:
+        log.warning(f"[comfyui] Failed to send interrupt: {exc}")
+
+
 # ── Workflow construction ──────────────────────────────────────────────────────
 
 def _build_workflow(

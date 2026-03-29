@@ -24,7 +24,7 @@ from websockets.exceptions import ConnectionClosed
 
 from config import VPS_URL, PIN, RECONNECT_DELAY, SKIP_TLS_VERIFY
 from crypto_utils import load_public_key_b64, decrypt_job, encrypt_result
-from comfyui import process_job
+from comfyui import process_job, interrupt_comfyui
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +34,10 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 WS_URL = f"{VPS_URL}/ws/pc"
+
+# Tracks the currently running job so cancel can target it
+_current_job_id: str | None = None
+_current_job_cancelled = asyncio.Event()
 
 
 async def run_client() -> None:
@@ -82,13 +86,30 @@ async def handle_message(ws, raw: str) -> None:
 
     if msg_type == "job":
         await handle_job(ws, msg)
+    elif msg_type == "cancel":
+        await handle_cancel(msg)
     else:
         log.warning(f"Unhandled message type: {msg_type}")
 
 
+async def handle_cancel(msg: dict) -> None:
+    global _current_job_id
+    cancel_id = msg.get("jobId", "")
+    if cancel_id and cancel_id == _current_job_id:
+        log.info(f"[job {cancel_id}] Cancel requested — interrupting ComfyUI.")
+        _current_job_cancelled.set()
+        await interrupt_comfyui()
+    else:
+        log.warning(f"[cancel] No matching running job for {cancel_id}")
+
+
 async def handle_job(ws, msg: dict) -> None:
+    global _current_job_id
     job_id: str = msg.get("jobId", "")
     payload: str = msg.get("payload", "")
+
+    _current_job_id = job_id
+    _current_job_cancelled.clear()
 
     log.info(f"[job {job_id}] Received.")
 
@@ -116,6 +137,10 @@ async def handle_job(ws, msg: dict) -> None:
             sampler=job_params["sampler"],
             progress_callback=send_progress,
         )
+
+        if _current_job_cancelled.is_set():
+            log.info(f"[job {job_id}] Cancelled — skipping result.")
+            return
 
         # ── Encrypt result ────────────────────────────────────────────────────
         encrypted_result = encrypt_result(aes_key_bytes, result_bytes)

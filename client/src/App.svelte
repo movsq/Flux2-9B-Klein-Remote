@@ -14,6 +14,7 @@
   let ws = $state(null);
   let view = $state('login');        // 'login' | 'submit'
   let currentAesKey = $state(null);
+  let currentJobId = $state(null);
   let currentResult = $state(null);
   let wsError = $state('');
   let showModal = $state(false);
@@ -30,10 +31,15 @@
     ws = createPhoneWS(token);
 
     ws.on('queued', ({ jobId }) => {
+      currentJobId = jobId;
       console.log(`[app] Job queued: ${jobId}`);
     });
 
     ws.on('result', (msg) => {
+      if (currentJobId && msg.jobId !== currentJobId) {
+        console.log(`[app] Ignoring stale result for job ${msg.jobId}`);
+        return;
+      }
       currentResult = msg;
       showModal = true;
     });
@@ -52,6 +58,18 @@
 
     ws.on('open', () => {
       wsError = '';
+    });
+
+    ws.on('reconnect_failed', () => {
+      ws.close();
+      ws = null;
+      token = null;
+      currentAesKey = null;
+      currentJobId = null;
+      currentResult = null;
+      wsError = '';
+      showModal = false;
+      view = 'login';
     });
   }
 
@@ -73,6 +91,7 @@
 
     currentResult = null;
     currentAesKey = null;
+    currentJobId = null;
     wsError = '';
     showModal = false;
   }

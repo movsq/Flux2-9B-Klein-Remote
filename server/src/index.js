@@ -188,6 +188,10 @@ function handlePcMessage(raw) {
       console.warn(`[pc] Result for unknown job ${msg.jobId}`);
       return;
     }
+    if (job.status === 'cancelled') {
+      console.log(`[pc] Ignoring result for cancelled job ${msg.jobId}`);
+      return;
+    }
     completeJob(msg.jobId, msg.payload);
     if (job.phoneWs?.readyState === 1) {
       sendJson(job.phoneWs, { type: 'result', jobId: msg.jobId, payload: msg.payload });
@@ -224,6 +228,9 @@ function handlePhoneSocket(ws) {
     if (msg.type === 'submit') {
       handleJobSubmit(ws, msg);
     } else if (msg.type === 'cancel') {
+      if (msg.jobId) {
+        updateJobStatus(msg.jobId, 'cancelled');
+      }
       if (pcSocket && pcSocket.readyState === 1) {
         sendJson(pcSocket, { type: 'cancel', jobId: msg.jobId });
       }
