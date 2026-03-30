@@ -57,10 +57,17 @@
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(6px);
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
-    padding: 1.5rem;
+    padding: 0.75rem 0.75rem 1.25rem;
     animation: fade-in 0.18s ease;
+  }
+
+  @media (min-width: 480px) {
+    .backdrop {
+      align-items: center;
+      padding: 1.5rem;
+    }
   }
 
   @keyframes fade-in {
@@ -72,15 +79,26 @@
     position: relative;
     width: 100%;
     max-width: 480px;
+    max-height: calc(100dvh - 2rem);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1.25rem;
-    padding: 1.75rem;
+    border-radius: 1.25rem 1.25rem 1rem 1rem;
+    padding: 1.25rem;
     backdrop-filter: blur(24px);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
+    overflow: hidden;
     animation: slide-up 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (min-width: 480px) {
+    .modal {
+      border-radius: 1.25rem;
+      padding: 1.75rem;
+      gap: 1rem;
+      max-height: calc(100dvh - 3rem);
+    }
   }
 
   @keyframes slide-up {
@@ -143,6 +161,9 @@
 
   .result-image {
     width: 100%;
+    flex: 1;
+    min-height: 0;
+    object-fit: contain;
     border-radius: 0.875rem;
     border: 1px solid rgba(255, 255, 255, 0.07);
     display: block;
@@ -151,6 +172,7 @@
   .actions {
     display: flex;
     gap: 0.75rem;
+    flex-shrink: 0;
   }
 
   .btn {

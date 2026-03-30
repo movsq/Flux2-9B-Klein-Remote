@@ -24,7 +24,16 @@
   let currentJobId = $state(null);
   let _timeoutId = null;
 
-  // ── Dropdown open state ───────────────────────────────────────────────
+  // ── Config overlay state ──────────────────────────────────────────────
+  let configOpen = $state(false);
+
+  // ── Drag state ────────────────────────────────────────────────────────
+  let dragOverSlot = $state(0);       // 0=none, 1=slot1, 2=slot2
+  let draggingFromSlot = $state(0);   // 0=not internal, 1 or 2
+  let cardDragActive = $state(false);
+  let _cardDragCount = 0;
+
+  // ── Dropdown open state (inside overlay only) ─────────────────────────
   let seedModeOpen = $state(false);
   let samplerOpen = $state(false);
 
@@ -41,9 +50,13 @@
   ];
 
   let seedModeLabel = $derived(seedModeOptions.find(o => o.value === seedMode)?.label ?? seedMode);
-  let samplerLabel = $derived(samplerOptions.find(o => o.value === sampler)?.label ?? sampler);
+  let samplerLabel  = $derived(samplerOptions.find(o => o.value === sampler)?.label ?? sampler);
 
-  // Click-outside action for dropdowns
+  let configSummary = $derived(
+    `${seed} · ${steps} steps · ${samplerLabel} · ${seedModeLabel.split(' ')[0]}`
+  );
+
+  // Click-outside action — reused for overlay panel and dropdowns
   function clickOutside(node, callback) {
     const handle = (e) => { if (!node.contains(e.target)) callback(); };
     document.addEventListener('pointerdown', handle, true);
@@ -107,20 +120,29 @@
   });
 
   // ── Image helpers ─────────────────────────────────────────────────────
-  function handleFileChange1(e) {
-    const file = e.target.files?.[0];
+  function setSlot1(file) {
     if (!file) return;
     if (imagePreviewUrl1) URL.revokeObjectURL(imagePreviewUrl1);
     imageFile1 = file;
     imagePreviewUrl1 = URL.createObjectURL(file);
+  }
+  function setSlot2(file) {
+    if (!file) return;
+    if (imagePreviewUrl2) URL.revokeObjectURL(imagePreviewUrl2);
+    imageFile2 = file;
+    imagePreviewUrl2 = URL.createObjectURL(file);
+  }
+
+  function handleFileChange1(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSlot1(file);
     e.target.value = '';
   }
   function handleFileChange2(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (imagePreviewUrl2) URL.revokeObjectURL(imagePreviewUrl2);
-    imageFile2 = file;
-    imagePreviewUrl2 = URL.createObjectURL(file);
+    setSlot2(file);
     e.target.value = '';
   }
   function clearImage1() {
@@ -130,6 +152,101 @@
   function clearImage2() {
     if (imagePreviewUrl2) URL.revokeObjectURL(imagePreviewUrl2);
     imageFile2 = null; imagePreviewUrl2 = null;
+  }
+
+  // ── Drag-and-drop: card-level ─────────────────────────────────────────
+  function onCardDragEnter(e) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    _cardDragCount++;
+    cardDragActive = true;
+  }
+  function onCardDragOver(e) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  function onCardDragLeave() {
+    _cardDragCount--;
+    if (_cardDragCount <= 0) {
+      _cardDragCount = 0;
+      cardDragActive = false;
+      dragOverSlot = 0;
+    }
+  }
+  function onCardDrop(e) {
+    e.preventDefault();
+    _cardDragCount = 0;
+    cardDragActive = false;
+    dragOverSlot = 0;
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    if (!imageFile1) setSlot1(file);
+    else if (!imageFile2) setSlot2(file);
+    else setSlot1(file);
+  }
+
+  // ── Drag-and-drop: per-slot ───────────────────────────────────────────
+  function onSlotDragEnter(e, slot) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragOverSlot = slot;
+    cardDragActive = false;
+  }
+  function onSlotDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = draggingFromSlot !== 0 ? 'move' : 'copy';
+  }
+  function onSlotDragLeave(e, slot) {
+    e.stopPropagation();
+    if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget)) {
+      if (dragOverSlot === slot) dragOverSlot = 0;
+    }
+  }
+  function onSlotDrop(e, slot) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragOverSlot = 0;
+    cardDragActive = false;
+    _cardDragCount = 0;
+    if (draggingFromSlot !== 0 && draggingFromSlot !== slot) {
+      const f1 = imageFile1, u1 = imagePreviewUrl1;
+      const f2 = imageFile2, u2 = imagePreviewUrl2;
+      imageFile1 = f2; imagePreviewUrl1 = u2;
+      imageFile2 = f1; imagePreviewUrl2 = u1;
+      draggingFromSlot = 0;
+      return;
+    }
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    if (slot === 1) setSlot1(file);
+    else setSlot2(file);
+  }
+
+  // ── Internal slot drag (swap) ─────────────────────────────────────────
+  let _transparentImg;
+  function getTransparentDragImage() {
+    if (!_transparentImg) {
+      _transparentImg = document.createElement('img');
+      _transparentImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+    return _transparentImg;
+  }
+  function onImgDragStart(e, slot) {
+    draggingFromSlot = slot;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+  }
+  function onImgDragEnd() {
+    draggingFromSlot = 0;
+  }
+
+  function swapImages() {
+    const f1 = imageFile1, u1 = imagePreviewUrl1;
+    const f2 = imageFile2, u2 = imagePreviewUrl2;
+    imageFile1 = f2; imagePreviewUrl1 = u2;
+    imageFile2 = f1; imagePreviewUrl2 = u1;
   }
 
   async function fileToBase64(file) {
@@ -190,8 +307,118 @@
   }
 </script>
 
+<!-- ── Config overlay ────────────────────────────────────────────────── -->
+{#if configOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+  <div
+    class="cfg-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Configuration"
+    tabindex="-1"
+    onclick={(e) => { if (e.target === e.currentTarget) { configOpen = false; seedModeOpen = false; samplerOpen = false; } }}
+  >
+    <div class="cfg-panel" use:clickOutside={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; }}>
+      <div class="cfg-handle"></div>
+      <div class="cfg-header">
+        <span class="cfg-title">CONFIGURATION</span>
+        <button class="cfg-close" type="button" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; }} aria-label="Close configuration">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="cfg-body">
+        <!-- Seed + After Gen -->
+        <div class="cfg-section">
+          <span class="cfg-section-label">SEED &amp; BEHAVIOR</span>
+          <div class="param-row">
+            <div class="param-field">
+              <label class="field-label" for="cfg-seed">SEED</label>
+              <input id="cfg-seed" type="number" min="0" step="1" bind:value={seed} />
+            </div>
+            <div class="param-field">
+              <span class="field-label">AFTER GEN</span>
+              <div class="custom-select" use:clickOutside={() => seedModeOpen = false}>
+                <button
+                  type="button"
+                  class="select-trigger"
+                  class:open={seedModeOpen}
+                  onclick={() => seedModeOpen = !seedModeOpen}
+                >
+                  <span>{seedModeLabel}</span>
+                  <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="select-list" class:visible={seedModeOpen}>
+                  {#each seedModeOptions as opt}
+                    <button
+                      type="button"
+                      class="select-option"
+                      class:active={seedMode === opt.value}
+                      onclick={() => { seedMode = opt.value; seedModeOpen = false; }}
+                    >{opt.label}</button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steps + Sampler -->
+        <div class="cfg-section">
+          <span class="cfg-section-label">SAMPLING</span>
+          <div class="param-row">
+            <div class="param-field">
+              <label class="field-label" for="cfg-steps">STEPS (1–8)</label>
+              <input id="cfg-steps" type="number" min="1" max="8" step="1" bind:value={steps} />
+            </div>
+            <div class="param-field">
+              <span class="field-label">SAMPLER</span>
+              <div class="custom-select" use:clickOutside={() => samplerOpen = false}>
+                <button
+                  type="button"
+                  class="select-trigger"
+                  class:open={samplerOpen}
+                  onclick={() => samplerOpen = !samplerOpen}
+                >
+                  <span>{samplerLabel}</span>
+                  <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="select-list" class:visible={samplerOpen}>
+                  {#each samplerOptions as opt}
+                    <button
+                      type="button"
+                      class="select-option"
+                      class:active={sampler === opt.value}
+                      onclick={() => { sampler = opt.value; samplerOpen = false; }}
+                    >{opt.label}</button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-footer">
+        <button type="button" class="cfg-done" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; }}>
+          DONE
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ── Main page ──────────────────────────────────────────────────────── -->
 <div class="page">
-  <div class="card">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="card"
+    class:card-drag={cardDragActive}
+    ondragenter={onCardDragEnter}
+    ondragover={onCardDragOver}
+    ondragleave={onCardDragLeave}
+    ondrop={onCardDrop}
+  >
     <form onsubmit={handleSubmit} class="form">
       <div class="form-header">
         <span class="form-title">ComfyLink</span>
@@ -200,13 +427,41 @@
 
       <!-- Images -->
       <div class="img-slots">
-        <div class="img-slot">
+        <!-- Slot 1 -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="img-slot"
+          class:drag-target={dragOverSlot === 1 || (cardDragActive && dragOverSlot === 0)}
+          ondragenter={(e) => onSlotDragEnter(e, 1)}
+          ondragover={onSlotDragOver}
+          ondragleave={(e) => onSlotDragLeave(e, 1)}
+          ondrop={(e) => onSlotDrop(e, 1)}
+        >
           <span class="field-label">IMAGE 1</span>
-          <label class="img-label">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <label
+            class="img-label"
+            draggable={imageFile1 ? 'true' : 'false'}
+            ondragstart={imageFile1 ? (e) => onImgDragStart(e, 1) : null}
+            ondragend={imageFile1 ? onImgDragEnd : null}
+          >
             {#if imagePreviewUrl1}
-              <img src={imagePreviewUrl1} alt="Slot 1 preview" class="img-preview" />
+              <div class="img-preview-wrap">
+                <img src={imagePreviewUrl1} alt="Slot 1 preview" class="img-preview" draggable="false" />
+                {#if draggingFromSlot === 1 && dragOverSlot === 2}
+                  <div class="swap-hint">SWAP ⇄</div>
+                {/if}
+              </div>
             {:else}
-              <div class="drop-zone">+ SELECT</div>
+              <div class="drop-zone">
+                {#if cardDragActive && dragOverSlot === 0}
+                  <span>DROP HERE</span>
+                {:else if dragOverSlot === 1}
+                  <span>{draggingFromSlot === 2 ? 'SWAP ⇄' : 'DROP'}</span>
+                {:else}
+                  <span>+ SELECT</span>
+                {/if}
+              </div>
             {/if}
             <input type="file" accept="image/*" onchange={handleFileChange1} class="hidden-input" />
           </label>
@@ -215,13 +470,41 @@
           {/if}
         </div>
 
-        <div class="img-slot">
+        <!-- Slot 2 -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="img-slot"
+          class:drag-target={dragOverSlot === 2 || (cardDragActive && dragOverSlot === 0)}
+          ondragenter={(e) => onSlotDragEnter(e, 2)}
+          ondragover={onSlotDragOver}
+          ondragleave={(e) => onSlotDragLeave(e, 2)}
+          ondrop={(e) => onSlotDrop(e, 2)}
+        >
           <span class="field-label">IMAGE 2</span>
-          <label class="img-label">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <label
+            class="img-label"
+            draggable={imageFile2 ? 'true' : 'false'}
+            ondragstart={imageFile2 ? (e) => onImgDragStart(e, 2) : null}
+            ondragend={imageFile2 ? onImgDragEnd : null}
+          >
             {#if imagePreviewUrl2}
-              <img src={imagePreviewUrl2} alt="Slot 2 preview" class="img-preview" />
+              <div class="img-preview-wrap">
+                <img src={imagePreviewUrl2} alt="Slot 2 preview" class="img-preview" draggable="false" />
+                {#if draggingFromSlot === 2 && dragOverSlot === 1}
+                  <div class="swap-hint">SWAP ⇄</div>
+                {/if}
+              </div>
             {:else}
-              <div class="drop-zone">+ SELECT</div>
+              <div class="drop-zone">
+                {#if cardDragActive && dragOverSlot === 0}
+                  <span>DROP HERE</span>
+                {:else if dragOverSlot === 2}
+                  <span>{draggingFromSlot === 1 ? 'SWAP ⇄' : 'DROP'}</span>
+                {:else}
+                  <span>+ SELECT</span>
+                {/if}
+              </div>
             {/if}
             <input type="file" accept="image/*" onchange={handleFileChange2} class="hidden-input" />
           </label>
@@ -231,6 +514,15 @@
         </div>
       </div>
 
+      {#if imageFile1 && imageFile2}
+        <div class="swap-row">
+          <button type="button" class="btn-swap" onclick={swapImages}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 4h9M1 4l2.5-2.5M1 4l2.5 2.5M13 10H4M13 10l-2.5-2.5M13 10l-2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            SWAP
+          </button>
+        </div>
+      {/if}
+
       <!-- Prompt -->
       <div class="field">
         <label class="field-label" for="prompt-input">PROMPT</label>
@@ -238,87 +530,22 @@
           id="prompt-input"
           placeholder="Describe your image..."
           bind:value={prompt}
-          rows="4"
+          rows="7"
           spellcheck="false"
         ></textarea>
       </div>
 
-      <!-- Seed + After generation -->
-      <div class="param-row">
-        <div class="param-field">
-          <label class="field-label" for="seed-input">SEED</label>
-          <input
-            id="seed-input"
-            type="number"
-            min="0"
-            step="1"
-            bind:value={seed}
-          />
-        </div>
-        <div class="param-field">
-          <span class="field-label">AFTER GEN</span>
-          <div class="custom-select" use:clickOutside={() => seedModeOpen = false}>
-            <button
-              type="button"
-              class="select-trigger"
-              class:open={seedModeOpen}
-              onclick={() => seedModeOpen = !seedModeOpen}
-            >
-              <span>{seedModeLabel}</span>
-              <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            </button>
-            <div class="select-list" class:visible={seedModeOpen}>
-              {#each seedModeOptions as opt}
-                <button
-                  type="button"
-                  class="select-option"
-                  class:active={seedMode === opt.value}
-                  onclick={() => { seedMode = opt.value; seedModeOpen = false; }}
-                >{opt.label}</button>
-              {/each}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Steps + Sampler -->
-      <div class="param-row">
-        <div class="param-field">
-          <label class="field-label" for="steps-input">STEPS (1-8)</label>
-          <input
-            id="steps-input"
-            type="number"
-            min="1"
-            max="8"
-            step="1"
-            bind:value={steps}
-          />
-        </div>
-        <div class="param-field">
-          <span class="field-label">SAMPLER</span>
-          <div class="custom-select" use:clickOutside={() => samplerOpen = false}>
-            <button
-              type="button"
-              class="select-trigger"
-              class:open={samplerOpen}
-              onclick={() => samplerOpen = !samplerOpen}
-            >
-              <span>{samplerLabel}</span>
-              <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            </button>
-            <div class="select-list" class:visible={samplerOpen}>
-              {#each samplerOptions as opt}
-                <button
-                  type="button"
-                  class="select-option"
-                  class:active={sampler === opt.value}
-                  onclick={() => { sampler = opt.value; samplerOpen = false; }}
-                >{opt.label}</button>
-              {/each}
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Config pill row -->
+      <button type="button" class="config-row" onclick={() => configOpen = true}>
+        <span class="config-row-left">
+          <svg class="config-icon" width="13" height="13" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="config-label">CONFIGURE</span>
+        </span>
+        <span class="config-summary">{configSummary}</span>
+      </button>
 
       {#if error}
         <p class="error">{error}</p>
@@ -373,6 +600,11 @@
     border-radius: 1.25rem;
     padding: 1.75rem;
     backdrop-filter: blur(12px);
+    transition: border-color 0.2s;
+  }
+
+  .card.card-drag {
+    border-color: rgba(123, 156, 191, 0.35);
   }
 
   /* ── Form ──────────────────────────────────────────────────────────── */
@@ -430,12 +662,14 @@
   .img-slot {
     display: flex;
     flex-direction: column;
+    border-radius: 0.75rem;
   }
 
   .img-label {
     cursor: pointer;
     display: block;
     touch-action: manipulation;
+    user-select: none;
   }
 
   .drop-zone {
@@ -444,13 +678,13 @@
     justify-content: center;
     border: 1px dashed rgba(255, 255, 255, 0.12);
     border-radius: 0.75rem;
-    height: 120px;
+    height: 180px;
     background: rgba(255, 255, 255, 0.02);
     color: #3f3f46;
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.12em;
-    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    transition: border-color 0.2s, color 0.2s, background 0.2s, box-shadow 0.2s;
   }
 
   .img-label:hover .drop-zone {
@@ -459,16 +693,83 @@
     background: rgba(123, 156, 191, 0.04);
   }
 
+  .img-preview-wrap {
+    position: relative;
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
   .img-preview {
     width: 100%;
-    height: 120px;
-    object-fit: cover;
+    height: 180px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.25);
     border-radius: 0.75rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
     display: block;
+    pointer-events: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .swap-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(9, 9, 11, 0.65);
+    color: #7b9cbf;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    pointer-events: none;
+  }
+
+  .drop-zone > span {
+    pointer-events: none;
+  }
+
+  .drag-target .drop-zone {
+    border-color: rgba(123, 156, 191, 0.6);
+    color: #7b9cbf;
+    background: rgba(123, 156, 191, 0.06);
+    box-shadow: 0 0 0 3px rgba(123, 156, 191, 0.12);
+  }
+
+  .drag-target .img-preview {
+    border-color: rgba(123, 156, 191, 0.5);
+    box-shadow: 0 0 0 3px rgba(123, 156, 191, 0.12);
   }
 
   .hidden-input { display: none; }
+
+  /* ── Swap row ────────────────────────────────────────────────────────── */
+  .swap-row {
+    display: flex;
+    justify-content: center;
+    margin-top: -0.25rem;
+  }
+
+  .btn-swap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: #52525b;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.12s ease;
+  }
+
+  .btn-swap:hover { color: #7b9cbf; border-color: rgba(123, 156, 191, 0.35); background: rgba(123, 156, 191, 0.05); }
+  .btn-swap:active { transform: scale(0.93); }
 
   .btn-clear {
     margin-top: 0.3rem;
@@ -589,7 +890,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0.75rem;
     overflow: hidden;
-    z-index: 20;
+    z-index: 60;
     max-height: 0;
     opacity: 0;
     pointer-events: none;
@@ -706,6 +1007,241 @@
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
+  }
+
+  /* ── Config pill row ─────────────────────────────────────────────────── */
+  .config-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.12s ease, filter 0.12s ease;
+    text-align: left;
+  }
+
+  .config-row:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .config-row:active { transform: scale(0.99); filter: brightness(0.9); }
+
+  .config-row-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .config-icon {
+    color: #52525b;
+    flex-shrink: 0;
+    transition: color 0.2s;
+  }
+  .config-row:hover .config-icon { color: #7b9cbf; }
+
+  .config-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    color: #52525b;
+    transition: color 0.2s;
+  }
+  .config-row:hover .config-label { color: #71717a; }
+
+  .config-summary {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    color: #3f3f46;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    transition: color 0.2s;
+  }
+  .config-row:hover .config-summary { color: #52525b; }
+
+  /* ── Config overlay ──────────────────────────────────────────────────── */
+  .cfg-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: cfg-backdrop-in 0.22s ease both;
+  }
+
+  @keyframes cfg-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .cfg-panel {
+    width: 100%;
+    max-width: 440px;
+    background: rgba(14, 14, 18, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding: 0 1.75rem 1.75rem;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 92dvh;
+    overflow: hidden;
+    animation: cfg-sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes cfg-sheet-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  @media (min-width: 600px) {
+    .cfg-backdrop { align-items: center; }
+
+    .cfg-panel {
+      border-radius: 1.25rem;
+      max-height: 80vh;
+      animation: cfg-panel-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes cfg-panel-in {
+      from { transform: scale(0.96) translateY(-6px); opacity: 0; }
+      to   { transform: scale(1)    translateY(0);    opacity: 1; }
+    }
+  }
+
+  .cfg-handle {
+    width: 2.5rem;
+    height: 3px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.12);
+    align-self: center;
+    margin: 1rem 0 0.75rem;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 600px) {
+    .cfg-handle { display: none; }
+  }
+
+  .cfg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 600px) {
+    .cfg-header { padding-top: 1.5rem; }
+  }
+
+  .cfg-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.22em;
+    color: #7b9cbf;
+  }
+
+  .cfg-close {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: #71717a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+    flex-shrink: 0;
+  }
+  .cfg-close:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .cfg-close:active { transform: scale(0.88); filter: brightness(0.85); }
+
+  .cfg-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+  .cfg-body::-webkit-scrollbar { width: 4px; }
+  .cfg-body::-webkit-scrollbar-track { background: transparent; }
+  .cfg-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .cfg-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .cfg-section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    color: #3f3f46;
+  }
+
+  .cfg-footer {
+    padding-top: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .cfg-done {
+    width: 100%;
+    padding: 0.85rem;
+    border: none;
+    border-radius: 3rem;
+    background: #7b9cbf;
+    color: #09090b;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s;
+  }
+  .cfg-done:hover { background: #a3bdd4; }
+  .cfg-done:active { transform: scale(0.97); filter: brightness(0.85); }
+
+  /* ── Mobile layout ───────────────────────────────────────────────────── */
+  @media (max-width: 599px) {
+    .page {
+      padding: 0.75rem 0.75rem 1.5rem;
+    }
+    .card {
+      padding: 1.25rem 1.1rem;
+    }
+    .form {
+      gap: 0.85rem;
+    }
+    .drop-zone {
+      height: 140px;
+    }
+    .img-preview {
+      height: 140px;
+    }
+    textarea {
+      max-height: 9.5rem;
+    }
   }
 
   /* ── Mobile font-size to prevent iOS zoom ───────────────────────────── */
