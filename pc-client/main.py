@@ -22,7 +22,7 @@ import sys
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from config import VPS_URL, PIN, RECONNECT_DELAY, SKIP_TLS_VERIFY
+from config import VPS_URL, PC_SECRET, RECONNECT_DELAY, SKIP_TLS_VERIFY
 from crypto_utils import load_public_key_b64, decrypt_job, encrypt_result
 from comfyui import process_job, interrupt_comfyui
 
@@ -56,9 +56,9 @@ async def run_client() -> None:
 
     async with websockets.connect(WS_URL, ssl=ssl_ctx, ping_interval=20, ping_timeout=30, max_size=50 * 1024 * 1024) as ws:
         # ── Step 1: Authenticate ──────────────────────────────────────────────
-        await ws.send(json.dumps({"type": "auth", "pin": PIN}))
+        await ws.send(json.dumps({"type": "auth", "secret": PC_SECRET}))
         auth_resp = json.loads(await ws.recv())
-
+        
         if auth_resp.get("type") != "auth_ok":
             log.error(f"Auth failed: {auth_resp}")
             return
@@ -155,6 +155,8 @@ async def handle_job(ws, msg: dict) -> None:
             progress_callback=send_progress,
             lora=job_params.get("lora"),
             lora_strength=job_params.get("loraStrength", 1.0),
+            gguf_name=job_params.get("quantization"),
+            clip_model=job_params.get("clipModel"),
         )
 
         if _current_job_cancelled.is_set():

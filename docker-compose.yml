@@ -5,8 +5,13 @@ services:
     # No ports exposed to host — Caddy is the only public entry point.
     environment:
       - PORT=3000
-      - PIN=${PIN}
+      - PC_SECRET=${PC_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - JWT_SECRET=${JWT_SECRET}
       - SESSION_TTL_MS=${SESSION_TTL_MS:-86400000}
+      - DB_PATH=/app/data/comfylink.db
+    volumes:
+      - server_data:/app/data
 
   caddy:
     image: caddy:2-alpine
@@ -16,6 +21,7 @@ services:
       - "443:443"
     environment:
       # Caddy uses FLUX_KLEIN_HOST as the site address in the Caddyfile ({$FLUX_KLEIN_HOST}).
+      # Falls back to localhost when the variable is not set.
       - FLUX_KLEIN_HOST=${FLUX_KLEIN_HOST:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -29,3 +35,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  server_data:

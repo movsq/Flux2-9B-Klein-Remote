@@ -2,9 +2,9 @@
 #
 # FLUX_KLEIN_HOST is injected as an environment variable by docker-compose.
 # Examples:
-#   Tailscale MagicDNS:  flux2-klein.tailXXXXX.ts.net  → add "tls internal" below
+#   Tailscale MagicDNS:  flux2-klein.tailXXXXX.ts.net   → add "tls internal" below
 #   Custom domain:       flux2-klein.example.com        → Caddy auto-provisions Let's Encrypt
-#   Raw LAN IP:          192.168.1.100                → add "tls internal" below
+#   Raw LAN IP:          192.168.1.100                  → add "tls internal" below
 
 {$FLUX_KLEIN_HOST:localhost} {
     # ── Uncomment for Tailscale or other private-CA networks ──────────────────
@@ -21,6 +21,18 @@
         reverse_proxy server:3000
     }
     handle /health* {
+        reverse_proxy server:3000
+    }
+    handle /codes* {
+        reverse_proxy server:3000
+    }
+    handle /vault* {
+        reverse_proxy server:3000
+    }
+    handle /results* {
+        reverse_proxy server:3000
+    }
+    handle /admin* {
         reverse_proxy server:3000
     }
 

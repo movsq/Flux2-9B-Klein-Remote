@@ -9,7 +9,9 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob } = $props();
+  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null } = $props();
+
+  let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
 
   // ── Per-form local state ──────────────────────────────────────────────
   let imageFile1 = $state(null);
@@ -21,6 +23,8 @@
   let sampler = $state('euler');
   let lora = $state('none');
   let loraStrength = $state(0.75);
+  let quantization = $state('flux-2-klein-9b-Q4_K_M.gguf');
+  let clipModel = $state('Qwen3-8B-Q4_K_M.gguf');
   let status = $state('idle'); // 'idle' | 'encrypting' | 'sent' | 'error'
   let error = $state('');
   let currentJobId = $state(null);
@@ -39,6 +43,8 @@
   let seedModeOpen = $state(false);
   let samplerOpen = $state(false);
   let loraOpen = $state(false);
+  let quantizationOpen = $state(false);
+  let clipModelOpen = $state(false);
 
   const seedModeOptions = [
     { value: 'randomize', label: 'Randomize' },
@@ -56,14 +62,28 @@
     { value: 'lora1.safetensors', label: 'LoRa - N1' },
     { value: 'lora2.safetensors', label: 'LoRa - N2' },
   ];
+  const quantizationOptions = [
+    { value: 'flux-2-klein-9b-Q4_K_M.gguf', label: 'flux-2-klein-9b-Q4_K_M.gguf', size: '5.91 GB' },
+    { value: 'flux-2-klein-9b-Q5_K_M.gguf', label: 'flux-2-klein-9b-Q5_K_M.gguf', size: '7.02 GB' },
+    { value: 'flux-2-klein-9b-Q6_K.gguf',   label: 'flux-2-klein-9b-Q6_K.gguf',   size: '7.87 GB' },
+  ];
+  const clipModelOptions = [
+    { value: 'Qwen3-8B-Q4_K_M.gguf',    label: 'Qwen3-8B-Q4_K_M.gguf',    size: '5.03 GB' },
+    { value: 'Qwen3-8B-Q4_K_M_v2.gguf', label: 'Qwen3-8B-Q4_K_M_v2.gguf', size: '5.03 GB' },
+  ];
 
-  let seedModeLabel = $derived(seedModeOptions.find(o => o.value === seedMode)?.label ?? seedMode);
-  let samplerLabel  = $derived(samplerOptions.find(o => o.value === sampler)?.label ?? sampler);
-  let loraLabel      = $derived(loraOptions.find(o => o.value === lora)?.label ?? lora);
+  let seedModeLabel     = $derived(seedModeOptions.find(o => o.value === seedMode)?.label ?? seedMode);
+  let samplerLabel      = $derived(samplerOptions.find(o => o.value === sampler)?.label ?? sampler);
+  let loraLabel         = $derived(loraOptions.find(o => o.value === lora)?.label ?? lora);
+  let quantizationLabel = $derived(quantizationOptions.find(o => o.value === quantization)?.label ?? quantization);
+  let quantizationSize  = $derived(quantizationOptions.find(o => o.value === quantization)?.size ?? '');
+  let clipModelLabel    = $derived(clipModelOptions.find(o => o.value === clipModel)?.label ?? clipModel);
+  let clipModelSize     = $derived(clipModelOptions.find(o => o.value === clipModel)?.size ?? '');
 
   let configSummary = $derived(
     `${seed} · ${steps} steps · ${samplerLabel} · ${seedModeLabel.split(' ')[0]}` +
-    (lora !== 'none' ? ` · ${loraLabel}` : '')
+    (lora !== 'none' ? ` · ${loraLabel}` : '') +
+    ` · ${quantizationLabel} · ${clipModelLabel}`
   );
 
   // Click-outside action — reused for overlay panel and dropdowns
@@ -117,6 +137,11 @@
       if (status === 'sent' && !currentJobId) {
         error = 'Connection lost — please try again';
         reset();
+      }
+      // If we were sitting on a stale error (e.g. no_pc, timeout), clear it
+      // now that the connection is healthy again.
+      if (status === 'error' || status === 'idle') {
+        error = '';
       }
     }));
 
@@ -284,7 +309,7 @@
   // ── Submit ────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!prompt.trim() || status === 'sent') return;
+    if (!prompt.trim() || status !== 'idle') return;
     error = '';
     _hadResult = false;  // prevent the _hadResult effect from resetting this new submission
     status = 'encrypting';
@@ -295,7 +320,7 @@
       const aesKey       = await deriveAESKey(ephKeyPair.privateKey, pcPublicKey);
       const image1B64    = await fileToBase64(imageFile1);
       const image2B64    = await fileToBase64(imageFile2);
-      const plaintext    = new TextEncoder().encode(JSON.stringify({ prompt: prompt.trim(), image1: image1B64, image2: image2B64, seed, steps, sampler, lora: lora !== 'none' ? lora : null, loraStrength: Number(loraStrength) }));
+      const plaintext    = new TextEncoder().encode(JSON.stringify({ prompt: prompt.trim(), image1: image1B64, image2: image2B64, seed, steps, sampler, lora: lora !== 'none' ? lora : null, loraStrength: Number(loraStrength), quantization, clipModel }));
       const { iv, ciphertext } = await encryptPayload(aesKey, plaintext);
       const ephPubKeyBytes = await exportEphemeralPublicKey(ephKeyPair.publicKey);
       const payload = encodeJobPayload(ephPubKeyBytes, iv, ciphertext);
@@ -340,13 +365,13 @@
     aria-modal="true"
     aria-label="Configuration"
     tabindex="-1"
-    onclick={(e) => { if (e.target === e.currentTarget) { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; } }}
+    onclick={(e) => { if (e.target === e.currentTarget) { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; quantizationOpen = false; clipModelOpen = false; } }}
   >
-    <div class="cfg-panel" use:clickOutside={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; }}>
+    <div class="cfg-panel" use:clickOutside={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; quantizationOpen = false; clipModelOpen = false; }}>
       <div class="cfg-handle"></div>
       <div class="cfg-header">
         <span class="cfg-title">CONFIGURATION</span>
-        <button class="cfg-close" type="button" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; }} aria-label="Close configuration">
+        <button class="cfg-close" type="button" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; quantizationOpen = false; clipModelOpen = false; }} aria-label="Close configuration">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -456,10 +481,73 @@
             </div>
           </div>
         </div>
+
+        <!-- Models -->
+        <div class="cfg-section cfg-section-quant">
+          <span class="cfg-section-label">MODELS</span>
+          <div class="param-row">
+            <div class="param-field">
+              <span class="field-label">DIFFUSION</span>
+              <div class="custom-select dropup" use:clickOutside={() => quantizationOpen = false}>
+                <button
+                  type="button"
+                  class="select-trigger"
+                  class:open={quantizationOpen}
+                  onclick={() => quantizationOpen = !quantizationOpen}
+                >
+                  <span class="trigger-label">{quantizationLabel}</span>
+                  <span class="trigger-size">{quantizationSize}</span>
+                  <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="select-list" class:visible={quantizationOpen}>
+                  {#each quantizationOptions as opt}
+                    <button
+                      type="button"
+                      class="select-option select-option-quant"
+                      class:active={quantization === opt.value}
+                      onclick={() => { quantization = opt.value; quantizationOpen = false; }}
+                    >
+                      <span>{opt.label}</span>
+                      <span class="quant-opt-size">{opt.size}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+            <div class="param-field">
+              <span class="field-label">CLIP</span>
+              <div class="custom-select dropup" use:clickOutside={() => clipModelOpen = false}>
+                <button
+                  type="button"
+                  class="select-trigger"
+                  class:open={clipModelOpen}
+                  onclick={() => clipModelOpen = !clipModelOpen}
+                >
+                  <span class="trigger-label">{clipModelLabel}</span>
+                  <span class="trigger-size">{clipModelSize}</span>
+                  <span class="chevron"><svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="select-list" class:visible={clipModelOpen}>
+                  {#each clipModelOptions as opt}
+                    <button
+                      type="button"
+                      class="select-option select-option-quant"
+                      class:active={clipModel === opt.value}
+                      onclick={() => { clipModel = opt.value; clipModelOpen = false; }}
+                    >
+                      <span>{opt.label}</span>
+                      <span class="quant-opt-size">{opt.size}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="cfg-footer">
-        <button type="button" class="cfg-done" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; }}>
+        <button type="button" class="cfg-done" onclick={() => { configOpen = false; seedModeOpen = false; samplerOpen = false; loraOpen = false; quantizationOpen = false; clipModelOpen = false; }}>
           DONE
         </button>
       </div>
@@ -480,8 +568,41 @@
   >
     <form onsubmit={handleSubmit} class="form">
       <div class="form-header">
-        <span class="form-title">ComfyLink</span>
-        <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+        <div class="form-header-left">
+          <span class="form-title">ComfyLink</span>
+          <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+        </div>
+        {#if isAdmin}
+          <button type="button" class="btn-admin" onclick={onOpenAdmin} aria-label="Admin panel">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
+              <circle cx="10" cy="17" r="1.2" fill="currentColor"/>
+              <circle cx="3" cy="10" r="1.2" fill="currentColor"/>
+              <circle cx="17" cy="10" r="1.2" fill="currentColor"/>
+            </svg>
+          </button>
+        {/if}
+        {#if showGalleryBtn}
+          <button type="button" class="btn-admin" onclick={onOpenGallery} aria-label="Saved results">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+          </button>
+        {/if}
+        {#if showVaultSettingsBtn}
+          <button type="button" class="btn-admin" onclick={onOpenVaultSettings} aria-label="Vault settings">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M7 5V4a3 3 0 016 0v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <circle cx="10" cy="11" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+        {/if}
       </div>
 
       <!-- Images -->
@@ -589,6 +710,7 @@
           id="prompt-input"
           placeholder="Describe your image..."
           bind:value={prompt}
+          oninput={() => { if (error) error = ''; }}
           rows="7"
           spellcheck="false"
         ></textarea>
@@ -615,6 +737,10 @@
         <p class="error">{error}</p>
       {/if}
 
+      {#if codeDepleted}
+        <p class="code-depleted">Access code has no remaining uses</p>
+      {/if}
+
       <!-- Generate row -->
       <div class="generate-row">
         {#if status === 'sent' && previewResult}
@@ -637,7 +763,7 @@
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         {:else}
-          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting'}>
+          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting' || codeDepleted}>
             {status === 'encrypting' ? 'ENCRYPTING...' : 'GENERATE'}
           </button>
         {/if}
@@ -680,10 +806,35 @@
 
   .form-header {
     display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+    align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 0.2rem;
   }
+
+  .form-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .btn-admin {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #8b96a6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+  }
+
+  .btn-admin:hover { background: rgba(255, 255, 255, 0.1); color: #7b9cbf; }
+  .btn-admin:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .form-title {
     font-family: 'Syne', sans-serif;
@@ -1130,10 +1281,18 @@
   .btn-cancel-icon:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
   .btn-cancel-icon:active { transform: scale(0.88); filter: brightness(0.85); }
 
-  /* ── Error ──────────────────────────────────────────────────────────── */
+  /* ── Error / Code status ─────────────────────────────────────────────── */
   .error {
     font-family: 'DM Mono', monospace;
     color: #c47070;
+    font-size: 0.75rem;
+    margin: 0;
+    letter-spacing: 0.03em;
+  }
+
+  .code-depleted {
+    font-family: 'DM Mono', monospace;
+    color: #c8a84b;
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
@@ -1395,5 +1554,47 @@
   /* ── Mobile font-size to prevent iOS zoom ───────────────────────────── */
   @media (hover: none) and (pointer: coarse) {
     input, textarea { font-size: 16px !important; }
+  }
+
+  /* ── Quantization section ────────────────────────────────────────────── */
+  .cfg-section-quant {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 1.25rem;
+  }
+
+  .cfg-section-quant .cfg-section-label {
+    color: #525a66;
+  }
+
+  .cfg-section-quant .param-row {
+    grid-template-columns: 1fr;
+  }
+
+  .trigger-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trigger-size {
+    font-size: 0.7rem;
+    color: #6c7585;
+    padding: 0 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .select-option-quant {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .quant-opt-size {
+    color: #525a66;
+    font-size: 0.72rem;
+    padding-left: 0.5rem;
+    flex-shrink: 0;
   }
 </style>
