@@ -31,7 +31,7 @@ match — and update the node IDs referenced in `pc-client/comfyui.py`.
 | Text-only | Prompt | Generates a new image from scratch (latent hardcoded to 1024×1024) |
 | Image + Prompt | Image 1 + Prompt | Edits / re-imagines Image 1 |
 | Multi-image + Prompt | Image 1 + Image 2 + Prompt | Composites Image 2 into the scene from Image 1 |
-
+Any mode can additionally apply a **LoRA adapter** (node 181) with a configurable strength. When `lora` is set to anything other than `"none"`, node 181 is wired between the model/CLIP loaders and their consumers; otherwise it is removed from the workflow entirely.
 Images are uploaded to ComfyUI's input directory via `POST /upload/image`,
 then referenced by filename in the native `LoadImage` nodes (177 / 178). They
 are scaled to ~1 megapixel before being fed to the model. A side-by-side
@@ -94,6 +94,7 @@ Install these via **ComfyUI Manager** (search by name) or clone directly.
 | 164 | `ClipLoaderGGUF` | Loads `qwen3-8b-q4_k_m.gguf` CLIP |
 | 177 | `LoadImage` | Image 1 input (filename set at runtime) |
 | 178 | `LoadImage` | Image 2 input (filename set at runtime, 2-image mode only) |
+| 181 | `LoraLoader` | Optional LoRA adapter — wired between model/CLIP loaders and consumers when `lora ≠ "none"`, removed otherwise |
 
 ### Node pruning by image count
 
@@ -104,6 +105,15 @@ Install these via **ComfyUI Manager** (search by name) or clone directly.
 | 2 images | *(none)* |
 | 1 image | 178, 133, 159, 161, 118 |
 | 0 images (text-only) | 177, 178, 133, 115, 159, 161, 118, 119 |
+
+### LoRA pruning
+
+Node 181 is handled separately from the image-count pruning:
+
+| `lora` param | Effect |
+|---|---|
+| `"none"` or unset | Node 181 removed; direct connections preserved: `[163,0] → [139]` (model), `[164,0] → [156]` (clip) |
+| Any LoRA filename | Node 181 wired in: `[163,0] → [181] → [139]` (model), `[164,0] → [181] → [156]` (clip); `strength_model` set to `loraStrength`, `strength_clip` fixed at 1.0 |
 
 ---
 

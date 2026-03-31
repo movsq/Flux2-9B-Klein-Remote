@@ -102,9 +102,9 @@ The ComfyUI workflow exists in two formats:
 
 At runtime, the pc-client:
 1. Loads `workflow_template.json` once at startup
-2. Deep-copies it per job, injecting the job parameters (prompt, seed, steps, sampler)
+2. Deep-copies it per job, injecting the job parameters (prompt, seed, steps, sampler, lora, lora strength)
 3. Uploads images to ComfyUI via `POST /upload/image` and patches their filenames into the `LoadImage` nodes
-4. Prunes unused nodes based on image count (0, 1, or 2 images)
+4. Prunes unused nodes based on image count (0, 1, or 2 images) and whether a LoRA is active
 5. POSTs the assembled workflow to ComfyUI's `/prompt` API
 6. Monitors progress via ComfyUI's WebSocket, then downloads the output image from `/history`
 
@@ -190,6 +190,7 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | `PIN` | *(required)* | Shared secret used to authenticate the phone and PC to the relay |
 | `DEPLOY_MODE` | `local` | `local` (connect to localhost) or `remote` (connect to `FLUX_KLEIN_HOST`) |
 | `FLUX_KLEIN_HOST` | — | Hostname of the VPS serving the app (e.g. `flux2-klein.example.com`) |
+| `VPS_URL` | — | Direct WebSocket URL for the relay (e.g. `wss://yourdomain.com`); overrides `DEPLOY_MODE` + `FLUX_KLEIN_HOST` when set |
 | `PORT` | `3000` | Port the Node.js relay listens on |
 | `SESSION_TTL_MS` | `86400000` | Phone session lifetime in ms (default: 24 h) |
 | `COMFYUI_URL` | `http://127.0.0.1:8188` | URL of the local ComfyUI instance — port must match **Settings → Server-Config → Port** in ComfyUI |
@@ -197,6 +198,7 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | `PRIVATE_KEY_PATH` | `private_key.pem` | Path to the PC's private key (relative to `pc-client/`) |
 | `PUBLIC_KEY_PATH` | `public_key.pem` | Path to the PC's public key |
 | `RECONNECT_DELAY` | `5` | Seconds between reconnect attempts (pc-client) |
+| `CLIENT_DIST_PATH` | *(auto)* | Override path to the built Svelte frontend served by the Node.js server; defaults to `../../client/dist` relative to `server/src/` |
 | `VPS_USER` | `root` | SSH username for manual deployments |
 | `VPS_SSH_HOST` | — | SSH address of the VPS for manual deployments |
 | `VPS_PATH` | `/root/flux2-9b-klein-remote` | Deployment path for manual deployments |
@@ -232,8 +234,8 @@ decrypts.
 | Server → Phone | `{ type: "queued", jobId: "..." }` |
 | Server → Phone | `{ type: "no_pc" }` — PC not connected |
 | Server → PC | `{ type: "job", jobId: "...", payload: "<b64>" }` |
-| PC → Server | `{ type: "progress", jobId: "...", value: N, max: M }` |
-| Server → Phone | `{ type: "progress", jobId: "...", value: N, max: M }` |
+| PC → Server | `{ type: "progress", jobId: "...", value: N, max: M, node: "..." }` |
+| Server → Phone | `{ type: "progress", jobId: "...", value: N, max: M, node: "..." }` |
 | PC → Server | `{ type: "result", jobId: "...", payload: "<b64>" }` |
 | Server → Phone | `{ type: "result", jobId: "...", payload: "<b64>" }` |
 | PC → Server | `{ type: "error", jobId: "...", message: "..." }` |
@@ -261,6 +263,7 @@ Flux2-9B-Klein-Remote/
 └── pc-client/
     ├── main.py                  ← WebSocket client — connects to relay
     ├── comfyui.py               ← builds workflow, submits to ComfyUI API
+    ├── comfyui_mock.py          ← local dev mock (returns tinted image, no GPU needed)
     ├── workflow_template.json   ← API-format workflow template (submitted to ComfyUI)
     ├── crypto_utils.py          ← ECDH / AES-GCM decrypt/encrypt
     ├── keygen.py                ← generates keypair (run once)
