@@ -1,14 +1,15 @@
 <script>
-  import { loginWithGoogle } from '../lib/api.js';
+  import { loginWithGoogle, loginWithCode } from '../lib/api.js';
 
   let { onLogin } = $props();
 
   let error = $state('');
   let loading = $state(false);
-  let step = $state('google');  // 'google' | 'invite' | 'pending'
+  let step = $state('google');  // 'google' | 'invite' | 'pending' | 'code'
   let hasCode = $state(false);
   let inviteCode = $state('');
   let googleIdToken = $state(null);
+  let accessCode = $state('');
 
   // Wait for Google Identity Services to load, then initialize
   let gsiReady = $state(false);
@@ -103,6 +104,23 @@
   function handleRegisterWithoutCode() {
     step = 'pending';
   }
+
+  async function handleAccessCode(e) {
+    e.preventDefault();
+    if (!accessCode.trim()) return;
+    error = '';
+    loading = true;
+    try {
+      const data = await loginWithCode(accessCode.trim());
+      if (data.token) {
+        onLogin(data.token, data.user);
+      }
+    } catch (err) {
+      error = err.message;
+    } finally {
+      loading = false;
+    }
+  }
 </script>
 
 <div class="login-bg">
@@ -124,7 +142,45 @@
       {#if error}
         <p class="error">{error}</p>
       {/if}
+
+      <div class="divider">
+        <span class="divider-line"></span><span class="divider-text">OR</span><span class="divider-line"></span>
+      </div>
+
+      <button type="button" class="btn-code-toggle" onclick={() => { step = 'code'; error = ''; }}>
+        Enter access code
+      </button>
     </div>
+
+  {:else if step === 'code'}
+    <form class="login-card" onsubmit={handleAccessCode}>
+      <div class="brand">
+        <span class="brand-title">ComfyLink</span>
+        <span class="brand-sub">ACCESS CODE</span>
+      </div>
+
+      <input
+        type="text"
+        placeholder="KLEIN-XXXX-XXXX"
+        autocomplete="off"
+        spellcheck="false"
+        bind:value={accessCode}
+        disabled={loading}
+        class="code-input"
+      />
+
+      <button type="submit" disabled={loading || !accessCode.trim()}>
+        {loading ? 'VERIFYING…' : 'ENTER'}
+      </button>
+
+      {#if error}
+        <p class="error">{error}</p>
+      {/if}
+
+      <button type="button" class="btn-code-toggle" onclick={() => { step = 'google'; error = ''; accessCode = ''; }}>
+        Sign in with Google instead
+      </button>
+    </form>
 
   {:else if step === 'invite'}
     <form class="login-card" onsubmit={handleInviteSubmit}>
@@ -388,6 +444,39 @@
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .divider-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: #525a66;
+    letter-spacing: 0.15em;
+  }
+
+  .btn-code-toggle {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: #525a66;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: color 0.2s;
+    text-align: center;
+  }
+  .btn-code-toggle:hover {
+    color: #8b96a6;
   }
 
   @media (hover: none) and (pointer: coarse) {

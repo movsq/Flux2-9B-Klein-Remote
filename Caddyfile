@@ -26,6 +26,15 @@
     handle /codes* {
         reverse_proxy server:3000
     }
+    handle /vault* {
+        reverse_proxy server:3000
+    }
+    handle /results* {
+        reverse_proxy server:3000
+    }
+    handle /admin* {
+        reverse_proxy server:3000
+    }
 
     # ── Frontend → static files built by Vite ─────────────────────────────────
     handle {

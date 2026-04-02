@@ -39,6 +39,34 @@ db.exec(`
     expires_at      INTEGER,
     created_at      INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS vault_keys (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id                     INTEGER UNIQUE NOT NULL REFERENCES users(id),
+    encrypted_master_key_bio    BLOB,
+    encrypted_master_key_pw     BLOB,
+    encrypted_master_key_recovery BLOB,
+    prf_salt                    BLOB,
+    pbkdf2_salt                 BLOB,
+    prf_credential_id           TEXT,
+    prf_public_key              BLOB,
+    created_at                  INTEGER NOT NULL,
+    updated_at                  INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS stored_results (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id),
+    encrypted_thumb BLOB    NOT NULL,
+    encrypted_full  BLOB    NOT NULL,
+    iv_thumb        BLOB    NOT NULL,
+    iv_full         BLOB    NOT NULL,
+    full_size_bytes INTEGER NOT NULL DEFAULT 0,
+    created_at      INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_stored_results_user_date
+    ON stored_results(user_id, created_at DESC);
 `);
 
 // ── Prepared statements ───────────────────────────────────────────────────────
@@ -72,6 +100,7 @@ const stmtCreateCode = db.prepare(`
 `);
 
 const stmtFindCode = db.prepare('SELECT * FROM invite_codes WHERE code = ?');
+const stmtFindCodeById = db.prepare('SELECT * FROM invite_codes WHERE id = ?');
 
 const stmtDecrementCodeUses = db.prepare(
   'UPDATE invite_codes SET uses_remaining = uses_remaining - 1 WHERE id = ?',
@@ -83,6 +112,69 @@ const stmtGetCodesByCreator = db.prepare(
 
 const stmtDeleteCode = db.prepare(
   'DELETE FROM invite_codes WHERE id = ? AND created_by = ?',
+);
+
+// Vault keys
+const stmtGetVaultByUser = db.prepare(
+  'SELECT * FROM vault_keys WHERE user_id = ?',
+);
+
+const stmtCreateVault = db.prepare(`
+  INSERT INTO vault_keys (user_id, encrypted_master_key_bio, encrypted_master_key_pw, encrypted_master_key_recovery,
+    prf_salt, pbkdf2_salt, prf_credential_id, prf_public_key, created_at, updated_at)
+  VALUES (@user_id, @encrypted_master_key_bio, @encrypted_master_key_pw, @encrypted_master_key_recovery,
+    @prf_salt, @pbkdf2_salt, @prf_credential_id, @prf_public_key, @created_at, @updated_at)
+`);
+
+const stmtUpdateVault = db.prepare(`
+  UPDATE vault_keys SET
+    encrypted_master_key_bio = @encrypted_master_key_bio,
+    encrypted_master_key_pw = @encrypted_master_key_pw,
+    encrypted_master_key_recovery = @encrypted_master_key_recovery,
+    prf_salt = @prf_salt,
+    pbkdf2_salt = @pbkdf2_salt,
+    prf_credential_id = @prf_credential_id,
+    prf_public_key = @prf_public_key,
+    updated_at = @updated_at
+  WHERE user_id = @user_id
+`);
+
+// Stored results
+const stmtCreateResult = db.prepare(`
+  INSERT INTO stored_results (user_id, encrypted_thumb, encrypted_full, iv_thumb, iv_full, full_size_bytes, created_at)
+  VALUES (@user_id, @encrypted_thumb, @encrypted_full, @iv_thumb, @iv_full, @full_size_bytes, @created_at)
+`);
+
+const stmtListResults = db.prepare(
+  'SELECT id, encrypted_thumb, iv_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? AND id < ? ORDER BY created_at DESC LIMIT ?',
+);
+
+const stmtListResultsFirst = db.prepare(
+  'SELECT id, encrypted_thumb, iv_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+);
+
+const stmtGetResultFull = db.prepare(
+  'SELECT encrypted_full, iv_full FROM stored_results WHERE id = ? AND user_id = ?',
+);
+
+const stmtDeleteResult = db.prepare(
+  'DELETE FROM stored_results WHERE id = ? AND user_id = ?',
+);
+
+const stmtDeleteAllResultsByUser = db.prepare(
+  'DELETE FROM stored_results WHERE user_id = ?',
+);
+
+const stmtDeleteVault = db.prepare(
+  'DELETE FROM vault_keys WHERE user_id = ?',
+);
+
+const stmtGetAllUsers = db.prepare(
+  'SELECT id, email, name, picture, status, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC',
+);
+
+const stmtGetUsersByStatus = db.prepare(
+  'SELECT id, email, name, picture, status, is_admin, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
 );
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -139,6 +231,10 @@ export function findInviteCode(code) {
   return stmtFindCode.get(code) ?? null;
 }
 
+export function findInviteCodeById(id) {
+  return stmtFindCodeById.get(id) ?? null;
+}
+
 export function decrementCodeUses(id) {
   return stmtDecrementCodeUses.run(id);
 }
@@ -162,6 +258,87 @@ export function validateInviteCode(code, type = 'registration') {
   if (row.expires_at !== null && Date.now() > row.expires_at) return null;
   if (row.uses_remaining !== null && row.uses_remaining <= 0) return null;
   return row;
+}
+
+// Vault keys
+
+export function getVaultByUser(userId) {
+  return stmtGetVaultByUser.get(userId) ?? null;
+}
+
+export function createVault(userId, data) {
+  const now = Date.now();
+  return stmtCreateVault.run({
+    user_id: userId,
+    encrypted_master_key_bio: data.encryptedMasterKeyBio ?? null,
+    encrypted_master_key_pw: data.encryptedMasterKeyPw ?? null,
+    encrypted_master_key_recovery: data.encryptedMasterKeyRecovery ?? null,
+    prf_salt: data.prfSalt ?? null,
+    pbkdf2_salt: data.pbkdf2Salt ?? null,
+    prf_credential_id: data.prfCredentialId ?? null,
+    prf_public_key: data.prfPublicKey ?? null,
+    created_at: now,
+    updated_at: now,
+  });
+}
+
+export function updateVault(userId, data) {
+  return stmtUpdateVault.run({
+    user_id: userId,
+    encrypted_master_key_bio: data.encryptedMasterKeyBio ?? null,
+    encrypted_master_key_pw: data.encryptedMasterKeyPw ?? null,
+    encrypted_master_key_recovery: data.encryptedMasterKeyRecovery ?? null,
+    prf_salt: data.prfSalt ?? null,
+    pbkdf2_salt: data.pbkdf2Salt ?? null,
+    prf_credential_id: data.prfCredentialId ?? null,
+    prf_public_key: data.prfPublicKey ?? null,
+    updated_at: Date.now(),
+  });
+}
+
+export const deleteVault = db.transaction((userId) => {
+  stmtDeleteAllResultsByUser.run(userId);
+  stmtDeleteVault.run(userId);
+});
+
+// Stored results
+
+export function createStoredResult(userId, data) {
+  const now = Date.now();
+  const result = stmtCreateResult.run({
+    user_id: userId,
+    encrypted_thumb: data.encryptedThumb,
+    encrypted_full: data.encryptedFull,
+    iv_thumb: data.ivThumb,
+    iv_full: data.ivFull,
+    full_size_bytes: data.fullSizeBytes ?? 0,
+    created_at: now,
+  });
+  return { id: Number(result.lastInsertRowid), createdAt: now };
+}
+
+export function listStoredResults(userId, { limit = 20, before = null } = {}) {
+  if (before) {
+    return stmtListResults.all(userId, before, limit);
+  }
+  return stmtListResultsFirst.all(userId, limit);
+}
+
+export function getStoredResultFull(id, userId) {
+  return stmtGetResultFull.get(id, userId) ?? null;
+}
+
+export function deleteStoredResult(id, userId) {
+  return stmtDeleteResult.run(id, userId);
+}
+
+// Admin: user management
+
+export function getAllUsers(status = null) {
+  if (status) {
+    return stmtGetUsersByStatus.all(status);
+  }
+  return stmtGetAllUsers.all();
 }
 
 export default db;

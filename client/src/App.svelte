@@ -3,7 +3,12 @@
   import Submit from './components/Submit.svelte';
   import Result from './components/Result.svelte';
   import Admin from './components/Admin.svelte';
+  import VaultSetup from './components/VaultSetup.svelte';
+  import VaultUnlock from './components/VaultUnlock.svelte';
+  import VaultSettings from './components/VaultSettings.svelte';
+  import Gallery from './components/Gallery.svelte';
   import { createPhoneWS } from './lib/ws.js';
+  import { getVaultInfo } from './lib/api.js';
   import { onDestroy } from 'svelte';
 
   function randomSeed() {
@@ -12,7 +17,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   let token = $state(null);
-  let user = $state(null);       // { name, email, status, isAdmin }
+  let user = $state(null);       // { name, email, status, isAdmin, type }
   let ws = $state(null);
   let view = $state('login');        // 'login' | 'submit'
   let currentAesKey = $state(null);
@@ -21,10 +26,22 @@
   let wsError = $state('');
   let showModal = $state(false);
   let showAdmin = $state(false);
+  let showGallery = $state(false);
+
+  // Vault state
+  let vaultInfo = $state(null);       // null | { configured, hasBio, hasPw, ... }
+  let masterKey = $state(null);       // CryptoKey when unlocked
+  let showVaultSetup = $state(false);
+  let showVaultUnlock = $state(false);
+  let showVaultSettings = $state(false);
+  let pendingVaultAction = $state(null); // callback after unlock
 
   // Seed + mode are owned here so they survive cycles
   let seed = $state(randomSeed());
   let seedMode = $state('randomize');
+
+  // Derived
+  let isGoogleUser = $derived(user?.type === 'google' || (user && !user.type));
 
   // ── Login ──────────────────────────────────────────────────────────────────
   function handleLogin(newToken, newUser) {
@@ -75,8 +92,71 @@
       wsError = '';
       showModal = false;
       showAdmin = false;
+      showGallery = false;
+      masterKey = null;
+      vaultInfo = null;
       view = 'login';
     });
+
+    // Check vault status for Google users
+    if (isGoogleUser) {
+      checkVault();
+    }
+  }
+
+  async function checkVault() {
+    try {
+      vaultInfo = await getVaultInfo(token);
+      if (vaultInfo && !vaultInfo.configured) {
+        showVaultSetup = true;
+      }
+    } catch {
+      vaultInfo = null;
+    }
+  }
+
+  // ── Vault ──────────────────────────────────────────────────────────────────
+  function handleVaultSetupComplete(key) {
+    masterKey = key;
+    showVaultSetup = false;
+    checkVault(); // refresh info
+  }
+
+  function handleVaultUnlocked(key) {
+    masterKey = key;
+    showVaultUnlock = false;
+    if (pendingVaultAction) {
+      pendingVaultAction();
+      pendingVaultAction = null;
+    }
+  }
+
+  function handleVaultReset() {
+    masterKey = null;
+    showVaultUnlock = false;
+    pendingVaultAction = null;
+    checkVault();
+  }
+
+  function requestVaultUnlock() {
+    if (!vaultInfo?.configured) {
+      showVaultSetup = true;
+      return;
+    }
+    showVaultUnlock = true;
+  }
+
+  function handleOpenGallery() {
+    if (!masterKey) {
+      pendingVaultAction = () => { showGallery = true; };
+      requestVaultUnlock();
+      return;
+    }
+    showGallery = true;
+  }
+
+  function handleOpenVaultSettings() {
+    showVaultSettings = true;
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -122,15 +202,68 @@
       onNewJob={handleDone}
       isAdmin={user?.isAdmin}
       onOpenAdmin={() => showAdmin = true}
+      showGalleryBtn={isGoogleUser && vaultInfo?.configured}
+      onOpenGallery={handleOpenGallery}
+      showVaultSettingsBtn={isGoogleUser && vaultInfo?.configured}
+      onOpenVaultSettings={handleOpenVaultSettings}
     />
   {/if}
 
   {#if showModal && currentResult}
-    <Result result={currentResult} aesKey={currentAesKey} onDone={handleDone} onClose={handleClose} />
+    <Result
+      result={currentResult}
+      aesKey={currentAesKey}
+      onDone={handleDone}
+      onClose={handleClose}
+      {token}
+      {masterKey}
+      userType={user?.type ?? 'google'}
+      onRequestVaultUnlock={requestVaultUnlock}
+    />
   {/if}
 
   {#if showAdmin && user?.isAdmin}
     <Admin {token} onClose={() => showAdmin = false} />
+  {/if}
+
+  {#if showVaultSetup && isGoogleUser}
+    <VaultSetup
+      {token}
+      userEmail={user?.email ?? ''}
+      onComplete={handleVaultSetupComplete}
+      onSkip={() => showVaultSetup = false}
+    />
+  {/if}
+
+  {#if showVaultUnlock && vaultInfo?.configured}
+    <VaultUnlock
+      {token}
+      {vaultInfo}
+      onUnlocked={handleVaultUnlocked}
+      onCancel={() => { showVaultUnlock = false; pendingVaultAction = null; }}
+      onOpenSettings={() => { showVaultUnlock = false; pendingVaultAction = null; showVaultSettings = true; }}
+    />
+  {/if}
+
+  {#if showVaultSettings && vaultInfo?.configured}
+    <VaultSettings
+      {token}
+      {vaultInfo}
+      {masterKey}
+      userEmail={user?.email ?? ''}
+      onClose={() => showVaultSettings = false}
+      onUpdated={() => { showVaultSettings = false; checkVault(); }}
+      onRequestUnlock={() => { showVaultSettings = false; pendingVaultAction = () => { showVaultSettings = true; }; requestVaultUnlock(); }}
+      onVaultReset={() => { showVaultSettings = false; handleVaultReset(); }}
+    />
+  {/if}
+
+  {#if showGallery && masterKey}
+    <Gallery
+      {token}
+      {masterKey}
+      onClose={() => showGallery = false}
+    />
   {/if}
 </div>
 

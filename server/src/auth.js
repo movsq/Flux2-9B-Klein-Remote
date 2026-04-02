@@ -43,9 +43,16 @@ export async function verifyGoogleToken(idToken) {
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
-export function signJwt({ userId, googleSub, status, isAdmin }) {
+export function signJwt({ userId, googleSub, status, isAdmin, codeId, type }) {
+  const payload = {};
+  if (userId != null) payload.userId = userId;
+  if (googleSub) payload.googleSub = googleSub;
+  if (status) payload.status = status;
+  if (isAdmin != null) payload.isAdmin = isAdmin;
+  if (codeId != null) payload.codeId = codeId;
+  if (type) payload.type = type;
   return jwt.sign(
-    { userId, googleSub, status, isAdmin },
+    payload,
     JWT_SECRET,
     { expiresIn: Math.floor(SESSION_TTL_MS / 1000) },
   );
@@ -124,5 +131,30 @@ export function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   req.user = { ...payload, status: user.status, isAdmin: true };
+  next();
+}
+
+/**
+ * Accepts either an active Google user JWT or a code-user JWT.
+ * Attaches req.user with at minimum { type }.
+ * For Google users: { userId, googleSub, status, isAdmin, type: 'google' }
+ * For code users: { codeId, type: 'code_user' }
+ */
+export function requireActiveOrCode(req, res, next) {
+  const token = extractToken(req);
+  const payload = verifyJwt(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (payload.type === 'code_user') {
+    req.user = payload;
+    return next();
+  }
+  // Google user path
+  const user = getUserById(payload.userId);
+  if (!user || user.status !== 'active') {
+    return res.status(403).json({ error: 'Account not active' });
+  }
+  req.user = { ...payload, status: user.status, isAdmin: !!user.is_admin, type: 'google' };
   next();
 }

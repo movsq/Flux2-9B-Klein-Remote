@@ -1,11 +1,16 @@
 <script>
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
+  import { encryptBlob, generateThumbnail, bufToB64 } from '../lib/vault-crypto.js';
+  import { saveResult } from '../lib/api.js';
 
-  let { result, aesKey, onDone, onClose } = $props();
+  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null } = $props();
 
   let imageUrl = $state(null);
   let decryptError = $state('');
   let decrypting = $state(true);
+  let saving = $state(false);
+  let saved = $state(false);
+  let saveError = $state('');
 
   $effect(() => {
     if (!result || !aesKey) return;
@@ -26,6 +31,42 @@
       decrypting = false;
     }
   }
+
+  async function handleSave() {
+    if (!masterKey) {
+      if (onRequestVaultUnlock) onRequestVaultUnlock();
+      return;
+    }
+
+    saving = true;
+    saveError = '';
+    try {
+      // Generate thumbnail
+      const thumbBuf = await generateThumbnail(imageUrl);
+
+      // Get full image data
+      const fullResp = await fetch(imageUrl);
+      const fullBuf = new Uint8Array(await fullResp.arrayBuffer());
+
+      // Encrypt both
+      const { ciphertext: encThumb, iv: ivThumb } = await encryptBlob(masterKey, thumbBuf);
+      const { ciphertext: encFull, iv: ivFull } = await encryptBlob(masterKey, fullBuf);
+
+      await saveResult(token, {
+        encryptedThumb: bufToB64(encThumb),
+        ivThumb: bufToB64(ivThumb),
+        encryptedFull: bufToB64(encFull),
+        ivFull: bufToB64(ivFull),
+        fullSizeBytes: fullBuf.length,
+      });
+
+      saved = true;
+    } catch (err) {
+      saveError = err.message || 'Save failed';
+    } finally {
+      saving = false;
+    }
+  }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
@@ -43,8 +84,19 @@
       <img src={imageUrl} alt="Generated result" class="result-image" />
       <div class="actions">
         <a href={imageUrl} download="result.png" class="btn btn-accent">Download</a>
+        {#if userType === 'google'}
+          <button onclick={handleSave} class="btn btn-ghost" disabled={saving || saved}>
+            {#if saved}✓ Saved
+            {:else if saving}Saving…
+            {:else}Save
+            {/if}
+          </button>
+        {/if}
         <button onclick={onDone} class="btn btn-ghost">New Job</button>
       </div>
+      {#if saveError}
+        <p class="save-error">{saveError}</p>
+      {/if}
     {/if}
   </div>
 </div>
@@ -215,5 +267,13 @@
   .btn-ghost:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #e4e4e7;
+  }
+
+  .save-error {
+    font-family: 'DM Mono', monospace;
+    color: #c47070;
+    font-size: 0.7rem;
+    margin: 0;
+    text-align: center;
   }
 </style>

@@ -25,6 +25,9 @@ export default defineConfig(({ mode }) => {
         '/pc-pubkey': `http://localhost:${PORT}`,
         '/codes': `http://localhost:${PORT}`,
         '/health': `http://localhost:${PORT}`,
+        '/vault': `http://localhost:${PORT}`,
+        '/results': `http://localhost:${PORT}`,
+        '/admin': `http://localhost:${PORT}`,
         '/ws': {
           target: `ws://localhost:${PORT}`,
           ws: true,

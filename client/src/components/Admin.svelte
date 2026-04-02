@@ -1,7 +1,9 @@
 <script>
-  import { generateCode, listCodes, deleteCode } from '../lib/api.js';
+  import { generateCode, listCodes, deleteCode, listUsers, updateUserStatus } from '../lib/api.js';
 
   let { token, onClose } = $props();
+
+  let activeTab = $state('codes'); // 'codes' | 'users'
 
   let codes = $state([]);
   let loading = $state(true);
@@ -13,6 +15,13 @@
   let usesRemaining = $state(1);
   let expiresInHours = $state('');
   let codeType = $state('registration');
+
+  // Users state
+  let users = $state([]);
+  let usersLoading = $state(false);
+  let usersError = $state('');
+  let userFilter = $state('all'); // 'all' | 'pending' | 'active' | 'suspended'
+  let updatingUserId = $state(null);
 
   // Load codes on mount
   $effect(() => {
@@ -81,6 +90,45 @@
     return code.usesRemaining !== null && code.usesRemaining <= 0;
   }
 
+  // Users management
+  async function loadUsers() {
+    usersLoading = true;
+    usersError = '';
+    try {
+      const filter = userFilter === 'all' ? null : userFilter;
+      users = await listUsers(token, filter);
+    } catch (err) {
+      usersError = err.message;
+    } finally {
+      usersLoading = false;
+    }
+  }
+
+  async function handleUpdateUser(userId, status) {
+    updatingUserId = userId;
+    usersError = '';
+    try {
+      await updateUserStatus(token, userId, status);
+      await loadUsers();
+    } catch (err) {
+      usersError = err.message;
+    } finally {
+      updatingUserId = null;
+    }
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    error = '';
+    usersError = '';
+    if (tab === 'users' && users.length === 0) loadUsers();
+  }
+
+  function formatUserDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   // Click-outside action
   function clickOutside(node, callback) {
     const handle = (e) => { if (!node.contains(e.target)) callback(); };
@@ -101,16 +149,24 @@
   <div class="admin-panel" use:clickOutside={onClose}>
     <div class="admin-handle"></div>
     <div class="admin-header">
-      <span class="admin-title">INVITE CODES</span>
+      <div class="tab-bar">
+        <button class="tab-btn" class:tab-active={activeTab === 'codes'} onclick={() => switchTab('codes')}>CODES</button>
+        <button class="tab-btn" class:tab-active={activeTab === 'users'} onclick={() => switchTab('users')}>USERS</button>
+      </div>
       <button class="admin-close" type="button" onclick={onClose} aria-label="Close">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
 
     <div class="admin-body">
+      {#if activeTab === 'codes'}
       <!-- Generate section -->
       <div class="gen-section">
         <span class="section-label">GENERATE NEW CODE</span>
+        <div class="type-toggle" role="group" aria-label="Code type">
+          <button class="type-opt" class:type-opt-active={codeType === 'registration'} onclick={() => codeType = 'registration'}>REGISTRATION</button>
+          <button class="type-opt" class:type-opt-active={codeType === 'job_access'} onclick={() => codeType = 'job_access'}>ACCESS</button>
+        </div>
         <div class="gen-row">
           <div class="gen-field">
             <label class="field-label" for="admin-uses">USES</label>
@@ -142,6 +198,8 @@
               <div class="code-main">
                 <span class="code-value">{code.code}</span>
                 <div class="code-meta">
+                  <span class="type-badge" class:type-reg={code.type === 'registration'} class:type-access={code.type === 'job_access'}>{code.type === 'registration' ? 'REG' : 'ACCESS'}</span>
+                  <span class="separator">·</span>
                   <span>{code.usesRemaining !== null ? `${code.usesRemaining} uses` : '∞ uses'}</span>
                   <span class="separator">·</span>
                   <span>{formatExpiry(code.expiresAt)}</span>
@@ -163,6 +221,60 @@
           {/each}
         {/if}
       </div>
+
+      {:else}
+      <!-- Users tab -->
+      <div class="filter-row">
+        {#each ['all', 'pending', 'active', 'suspended'] as f}
+          <button class="filter-btn" class:filter-active={userFilter === f} onclick={() => { userFilter = f; loadUsers(); }}>
+            {f.toUpperCase()}
+          </button>
+        {/each}
+      </div>
+
+      {#if usersError}
+        <p class="error">{usersError}</p>
+      {/if}
+
+      <div class="user-list">
+        {#if usersLoading}
+          <p class="empty">Loading…</p>
+        {:else if users.length === 0}
+          <p class="empty">No users found.</p>
+        {:else}
+          {#each users as u (u.id)}
+            <div class="user-item">
+              <div class="user-main">
+                <span class="user-email">{u.email}</span>
+                <div class="user-meta">
+                  <span class="status-badge" class:status-active={u.status === 'active'} class:status-pending={u.status === 'pending'} class:status-rejected={u.status === 'suspended'}>
+                    {u.status.toUpperCase()}
+                  </span>
+                  {#if u.isAdmin}
+                    <span class="role-badge">ADMIN</span>
+                  {/if}
+                  <span class="user-date">{formatUserDate(u.createdAt)}</span>
+                </div>
+              </div>
+              {#if !u.isAdmin}
+                <div class="user-actions">
+                  {#if u.status !== 'active'}
+                    <button class="btn-small btn-approve" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'active')}>
+                      ✓
+                    </button>
+                  {/if}
+                  {#if u.status !== 'suspended'}
+                    <button class="btn-small btn-reject" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'suspended')}>
+                      ✕
+                    </button>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -245,13 +357,6 @@
 
   @media (min-width: 600px) {
     .admin-header { padding-top: 1.5rem; }
-  }
-
-  .admin-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.22em;
-    color: #7b9cbf;
   }
 
   .admin-close {
@@ -448,7 +553,170 @@
 
   .btn-delete:hover { color: #c47070; }
 
+  /* Tabs */
+  .tab-bar {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .tab-btn {
+    padding: 0.4rem 0.75rem;
+    border: none;
+    border-radius: 3rem;
+    background: transparent;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: #6c7585;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .tab-btn:hover { color: #a4afbb; }
+  .tab-active {
+    background: rgba(123, 156, 191, 0.12);
+    color: #7b9cbf;
+  }
+
+  /* User filter */
+  .filter-row {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3rem;
+    background: transparent;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: #6c7585;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .filter-btn:hover { color: #a4afbb; border-color: rgba(255, 255, 255, 0.12); }
+  .filter-active {
+    background: rgba(123, 156, 191, 0.1);
+    color: #7b9cbf;
+    border-color: rgba(123, 156, 191, 0.2);
+  }
+
+  /* User list */
+  .user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .user-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.65rem 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0.75rem;
+  }
+  .user-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .user-email {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: #e4e4e7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .user-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+  }
+  .status-badge {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3rem;
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+  }
+  .status-active { background: rgba(100, 180, 100, 0.15); color: #64b464; }
+  .status-pending { background: rgba(200, 180, 80, 0.15); color: #c8b450; }
+  .status-rejected { background: rgba(196, 112, 112, 0.15); color: #c47070; }
+  .role-badge {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3rem;
+    background: rgba(123, 156, 191, 0.15);
+    color: #7b9cbf;
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+  }
+  .user-date { color: #525a66; }
+  .user-actions {
+    display: flex;
+    gap: 0.3rem;
+    flex-shrink: 0;
+  }
+  .btn-small {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: transparent;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s, background 0.2s, color 0.2s;
+  }
+  .btn-small:active { transform: scale(0.88); }
+  .btn-small:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-approve { color: #64b464; }
+  .btn-approve:hover { background: rgba(100, 180, 100, 0.15); }
+  .btn-reject { color: #c47070; }
+  .btn-reject:hover { background: rgba(196, 112, 112, 0.15); }
+
   @media (hover: none) and (pointer: coarse) {
     input[type='number'] { font-size: 16px !important; }
   }
+
+  /* Code type toggle */
+  .type-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3rem;
+    padding: 0.2rem;
+  }
+  .type-opt {
+    flex: 1;
+    padding: 0.4rem 0.75rem;
+    border: none;
+    border-radius: 3rem;
+    background: transparent;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    color: #6c7585;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+  }
+  .type-opt:hover { color: #a4afbb; }
+  .type-opt-active { background: rgba(123, 156, 191, 0.15); color: #7b9cbf; }
+
+  /* Code type badge in list */
+  .type-badge {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3rem;
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+  }
+  .type-reg { background: rgba(123, 156, 191, 0.15); color: #7b9cbf; }
+  .type-access { background: rgba(160, 140, 200, 0.15); color: #a08cc8; }
 </style>
