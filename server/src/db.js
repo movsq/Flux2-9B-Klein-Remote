@@ -114,6 +114,10 @@ const stmtDeleteCode = db.prepare(
   'DELETE FROM invite_codes WHERE id = ? AND created_by = ?',
 );
 
+const stmtUpdateCode = db.prepare(
+  'UPDATE invite_codes SET uses_remaining = @uses_remaining, expires_at = @expires_at WHERE id = @id AND created_by = @created_by',
+);
+
 // Vault keys
 const stmtGetVaultByUser = db.prepare(
   'SELECT * FROM vault_keys WHERE user_id = ?',
@@ -245,6 +249,10 @@ export function getCodesByCreator(userId) {
 
 export function deleteInviteCode(id, createdBy) {
   return stmtDeleteCode.run(id, createdBy);
+}
+
+export function updateInviteCode(id, createdBy, { usesRemaining, expiresAt }) {
+  return stmtUpdateCode.run({ id, created_by: createdBy, uses_remaining: usesRemaining ?? null, expires_at: expiresAt ?? null });
 }
 
 /**

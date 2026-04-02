@@ -9,7 +9,9 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings } = $props();
+  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null } = $props();
+
+  let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
 
   // ── Per-form local state ──────────────────────────────────────────────
   let imageFile1 = $state(null);
@@ -128,6 +130,11 @@
       if (status === 'sent' && !currentJobId) {
         error = 'Connection lost — please try again';
         reset();
+      }
+      // If we were sitting on a stale error (e.g. no_pc, timeout), clear it
+      // now that the connection is healthy again.
+      if (status === 'error' || status === 'idle') {
+        error = '';
       }
     }));
 
@@ -295,7 +302,7 @@
   // ── Submit ────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!prompt.trim() || status === 'sent') return;
+    if (!prompt.trim() || status !== 'idle') return;
     error = '';
     _hadResult = false;  // prevent the _hadResult effect from resetting this new submission
     status = 'encrypting';
@@ -665,6 +672,7 @@
           id="prompt-input"
           placeholder="Describe your image..."
           bind:value={prompt}
+          oninput={() => { if (error) error = ''; }}
           rows="7"
           spellcheck="false"
         ></textarea>
@@ -691,6 +699,10 @@
         <p class="error">{error}</p>
       {/if}
 
+      {#if codeDepleted}
+        <p class="code-depleted">Access code has no remaining uses</p>
+      {/if}
+
       <!-- Generate row -->
       <div class="generate-row">
         {#if status === 'sent' && previewResult}
@@ -713,7 +725,7 @@
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         {:else}
-          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting'}>
+          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting' || codeDepleted}>
             {status === 'encrypting' ? 'ENCRYPTING...' : 'GENERATE'}
           </button>
         {/if}
@@ -1231,10 +1243,18 @@
   .btn-cancel-icon:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
   .btn-cancel-icon:active { transform: scale(0.88); filter: brightness(0.85); }
 
-  /* ── Error ──────────────────────────────────────────────────────────── */
+  /* ── Error / Code status ─────────────────────────────────────────────── */
   .error {
     font-family: 'DM Mono', monospace;
     color: #c47070;
+    font-size: 0.75rem;
+    margin: 0;
+    letter-spacing: 0.03em;
+  }
+
+  .code-depleted {
+    font-family: 'DM Mono', monospace;
+    color: #c8a84b;
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;

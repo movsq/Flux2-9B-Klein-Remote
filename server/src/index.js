@@ -4,7 +4,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
@@ -28,6 +28,7 @@ import {
   createInviteCode,
   getCodesByCreator,
   deleteInviteCode,
+  updateInviteCode,
   getVaultByUser,
   createVault,
   updateVault,
@@ -52,6 +53,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ── PC relay state ────────────────────────────────────────────────────────────
 let pcSocket = null;
 let pcPublicKeyB64 = null;
+
+// ── Admin WebSocket connections ───────────────────────────────────────────────
+// Map<WebSocket, userId> for all currently-connected admin sockets
+const adminSockets = new Map();
+
+function notifyAdmins(type) {
+  for (const ws of adminSockets.keys()) {
+    sendJson(ws, { type });
+  }
+}
+
+// ── Code-user phone socket tracking ──────────────────────────────────────────
+// Map<codeId, Set<WebSocket>> — live connections authenticated via an invite code
+const phoneCodeSockets = new Map();
+
+function registerCodeSocket(codeId, ws) {
+  if (!phoneCodeSockets.has(codeId)) phoneCodeSockets.set(codeId, new Set());
+  phoneCodeSockets.get(codeId).add(ws);
+}
+
+function unregisterCodeSocket(codeId, ws) {
+  phoneCodeSockets.get(codeId)?.delete(ws);
+}
+
+function notifyCodeUsers(codeId, usesRemaining) {
+  const sockets = phoneCodeSockets.get(codeId);
+  if (!sockets) return;
+  for (const ws of sockets) {
+    sendJson(ws, { type: 'code_status', usesRemaining });
+  }
+}
 
 function sendJson(ws, obj) {
   if (ws.readyState === 1 /* OPEN */) {
@@ -115,6 +147,8 @@ app.post('/auth/google', async (req, res) => {
       status: 'active',
     });
     decrementCodeUses(code.id);
+    notifyAdmins('users_changed');
+    notifyAdmins('codes_changed');
     const token = signJwt({
       userId: user.id,
       googleSub: user.google_sub,
@@ -134,8 +168,7 @@ app.post('/auth/google', async (req, res) => {
     name: googleUser.name,
     picture: googleUser.picture,
     status: 'pending',
-  });
-  return res.status(200).json({ status: 'pending_approval', isNew: true });
+  });  notifyAdmins('users_changed');  return res.status(200).json({ status: 'pending_approval', isNew: true });
 });
 
 /** GET /auth/me — return current user info from DB */
@@ -196,6 +229,7 @@ app.post('/codes', requireAdmin, (req, res) => {
     expiresAt,
   });
 
+  notifyAdmins('codes_changed');
   res.json({ code, type, usesRemaining, expiresAt });
 });
 
@@ -218,6 +252,34 @@ app.delete('/codes/:id', requireAdmin, (req, res) => {
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
   const result = deleteInviteCode(id, req.user.userId);
   if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
+  notifyAdmins('codes_changed');
+  res.json({ ok: true });
+});
+
+/** PATCH /codes/:id — edit uses_remaining and/or expires_at of an existing code */
+app.patch('/codes/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const { usesRemaining, expiresInHours } = req.body ?? {};
+
+  if (usesRemaining !== undefined && usesRemaining !== null) {
+    const n = parseInt(usesRemaining, 10);
+    if (isNaN(n) || n < 0) return res.status(400).json({ error: 'usesRemaining must be a non-negative integer or null' });
+  }
+  if (expiresInHours !== undefined && expiresInHours !== null) {
+    const n = parseFloat(expiresInHours);
+    if (isNaN(n) || n <= 0) return res.status(400).json({ error: 'expiresInHours must be a positive number or null' });
+  }
+
+  const expiresAt = expiresInHours != null ? Date.now() + parseFloat(expiresInHours) * 3600_000 : null;
+  const uses = usesRemaining != null ? parseInt(usesRemaining, 10) : null;
+
+  const result = updateInviteCode(id, req.user.userId, { usesRemaining: uses, expiresAt });
+  if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
+  notifyAdmins('codes_changed');
+  // Push updated status to any connected code-users for this code
+  notifyCodeUsers(id, uses);
   res.json({ ok: true });
 });
 
@@ -444,6 +506,7 @@ app.patch('/admin/users/:id', requireAdmin, (req, res) => {
   }
 
   updateUserStatus(id, status);
+  notifyAdmins('users_changed');
   res.json({ ok: true });
 });
 
@@ -462,6 +525,24 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 50 * 1024 * 1024 }
 
 server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url, 'http://localhost');
+
+  if (url.pathname === '/ws/admin') {
+    const token = url.searchParams.get('token');
+    const payload = verifyJwt(token);
+    if (!payload) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    const adminUser = getUserById(payload.userId);
+    if (!adminUser || !adminUser.is_admin) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => handleAdminSocket(ws, adminUser.id));
+    return;
+  }
 
   if (url.pathname === '/ws/pc') {
     wss.handleUpgrade(req, socket, head, (ws) => handlePcSocket(ws));
@@ -606,6 +687,13 @@ function handlePcMessage(raw) {
 function handlePhoneSocket(ws, jwtPayload) {
   console.log(`[phone] Connected (${jwtPayload.type === 'code_user' ? 'code' : 'google'}).`);
 
+  if (jwtPayload.type === 'code_user') {
+    registerCodeSocket(jwtPayload.codeId, ws);
+    // Send initial code status so the client can show a warning immediately
+    const codeRow = findInviteCodeById(jwtPayload.codeId);
+    if (codeRow) sendJson(ws, { type: 'code_status', usesRemaining: codeRow.uses_remaining });
+  }
+
   ws.on('message', (raw) => {
     let msg;
     try {
@@ -629,7 +717,12 @@ function handlePhoneSocket(ws, jwtPayload) {
     }
   });
 
-  ws.on('close', () => console.log('[phone] Disconnected.'));
+  ws.on('close', () => {
+    if (jwtPayload.type === 'code_user') {
+      unregisterCodeSocket(jwtPayload.codeId, ws);
+    }
+    console.log('[phone] Disconnected.');
+  });
 }
 
 function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
@@ -643,6 +736,16 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
     return;
   }
 
+  // ── Deduplication: reject identical payloads submitted within 10 s on the same socket ──
+  const payloadHash = createHash('sha256').update(msg.payload).digest('hex');
+  const now = Date.now();
+  if (!phoneWs._lastSubmit) phoneWs._lastSubmit = { hash: null, at: 0 };
+  if (phoneWs._lastSubmit.hash === payloadHash && now - phoneWs._lastSubmit.at < 10_000) {
+    console.warn('[relay] Duplicate submit detected — ignoring.');
+    return;
+  }
+  phoneWs._lastSubmit = { hash: payloadHash, at: now };
+
   if (jwtPayload?.type === 'code_user') {
     const codeRow = findInviteCodeById(jwtPayload.codeId);
     if (!codeRow || (codeRow.uses_remaining !== null && codeRow.uses_remaining <= 0)) {
@@ -651,6 +754,9 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
     }
     if (codeRow.uses_remaining !== null) {
       decrementCodeUses(codeRow.id);
+      notifyAdmins('codes_changed');
+      // Tell the code-user their remaining count so the UI can update proactively
+      notifyCodeUsers(jwtPayload.codeId, codeRow.uses_remaining - 1);
     }
   }
 
@@ -660,6 +766,22 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
   sendJson(pcSocket, { type: 'job', jobId, payload: msg.payload });
   updateJobStatus(jobId, 'processing');
   console.log(`[relay] Job ${jobId} dispatched.`);
+}
+
+// ── Admin socket handler ────────────────────────────────────────────────────────────
+function handleAdminSocket(ws, userId) {
+  console.log(`[admin-ws] Connected (user ${userId}).`);
+  adminSockets.set(ws, userId);
+
+  // Push an initial refresh signal so the panel catches up if it missed anything
+  // before the WS was established (small race window on first open).
+  sendJson(ws, { type: 'codes_changed' });
+  sendJson(ws, { type: 'users_changed' });
+
+  ws.on('close', () => {
+    adminSockets.delete(ws);
+    console.log(`[admin-ws] Disconnected (user ${userId}).`);
+  });
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────

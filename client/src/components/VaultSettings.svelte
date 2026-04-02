@@ -152,15 +152,20 @@
       </div>
 
       <div class="methods-status">
-        <div class="status-row">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-          </svg>
-          <span class="status-label">Biometric</span>
-          {#if vaultInfo.hasBio}
-            <span class="status-badge enabled">Active</span>
-          {:else}
-            <span class="status-badge disabled">Not set up</span>
+        <div class="status-block">
+          <div class="status-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+            <span class="status-label">Biometric</span>
+            {#if vaultInfo.hasBio}
+              <span class="status-badge enabled">Active</span>
+            {:else}
+              <span class="status-badge disabled">Not set up</span>
+            {/if}
+          </div>
+          {#if !vaultInfo.hasBio && !checkingPlatform && (!webauthnSupported || !platformAvailable)}
+            <p class="row-hint">Not available on this device</p>
           {/if}
         </div>
 
@@ -189,12 +194,10 @@
         </div>
       </div>
 
-      {#if !vaultInfo.hasBio}
+      {#if !vaultInfo.hasBio && (checkingPlatform || canAddBio)}
         <div class="add-section">
           {#if checkingPlatform}
             <p class="hint">Checking for biometric support…</p>
-          {:else if !webauthnSupported || !platformAvailable}
-            <p class="hint">Biometric is not available on this device.</p>
           {:else}
             <p class="hint">Add fingerprint or Face ID to unlock your vault faster on this device.</p>
             <button class="btn-primary" disabled={loading || !canAddBio} onclick={handleAddBiometric}>
@@ -374,6 +377,17 @@
   .status-badge.disabled {
     background: rgba(255, 255, 255, 0.04); color: #525a66;
     border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .status-block {
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+
+  .row-hint {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem; color: #525a66; margin: 0;
+    padding-left: 1.75rem; /* align under label, past icon */
+    letter-spacing: 0.04em;
   }
 
   .add-section {

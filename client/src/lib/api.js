@@ -81,6 +81,19 @@ export async function deleteCode(token, id) {
   return res.json();
 }
 
+export async function updateCode(token, id, { usesRemaining, expiresInHours }) {
+  const res = await fetch(`/codes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usesRemaining, expiresInHours }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update code: ${res.status}`);
+  }
+  return res.json();
+}
+
 // ── Vault ───────────────────────────────────────────────────────────────────
 
 export async function setupVault(token, data) {

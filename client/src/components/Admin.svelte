@@ -1,5 +1,5 @@
 <script>
-  import { generateCode, listCodes, deleteCode, listUsers, updateUserStatus } from '../lib/api.js';
+  import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus } from '../lib/api.js';
 
   let { token, onClose } = $props();
 
@@ -16,6 +16,13 @@
   let expiresInHours = $state('');
   let codeType = $state('registration');
 
+  // Edit state for existing codes
+  let editingCodeId = $state(null);
+  let editUsesRemaining = $state('');
+  let editExpiresInHours = $state('');
+  let editSaving = $state(false);
+  let editError = $state('');
+
   // Users state
   let users = $state([]);
   let usersLoading = $state(false);
@@ -23,13 +30,45 @@
   let userFilter = $state('all'); // 'all' | 'pending' | 'active' | 'suspended'
   let updatingUserId = $state(null);
 
-  // Load codes on mount
+  // ── Admin WebSocket for real-time updates ──────────────────────────────────
+  let adminWs = null;
+  let adminWsReconnectTimer = null;
+
+  function connectAdminWS() {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${protocol}://${location.host}/ws/admin?token=${encodeURIComponent(token)}`);
+    adminWs = ws;
+
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === 'codes_changed') {
+        loadCodes();
+      } else if (msg.type === 'users_changed') {
+        // Refresh users if already loaded
+        if (activeTab === 'users' || users.length > 0) loadUsers();
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      if (adminWs !== ws) return; // superseded
+      adminWsReconnectTimer = setTimeout(connectAdminWS, 5000);
+    });
+  }
+
+  // Load codes on mount, connect admin WS
   $effect(() => {
     loadCodes();
+    connectAdminWS();
+    return () => {
+      // Cleanup on panel close
+      clearTimeout(adminWsReconnectTimer);
+      if (adminWs) { adminWs.close(); adminWs = null; }
+    };
   });
 
   async function loadCodes() {
-    loading = true;
+    if (codes.length === 0) loading = true;
     try {
       codes = await listCodes(token);
     } catch (err) {
@@ -66,6 +105,40 @@
     }
   }
 
+  function startEdit(code) {
+    editingCodeId = code.id;
+    editUsesRemaining = code.usesRemaining !== null ? String(code.usesRemaining) : '';
+    // Convert stored expiresAt timestamp to hours from now (rounded up)
+    if (code.expiresAt && Date.now() < code.expiresAt) {
+      editExpiresInHours = String(Math.ceil((code.expiresAt - Date.now()) / 3600_000));
+    } else {
+      editExpiresInHours = '';
+    }
+    editError = '';
+  }
+
+  function cancelEdit() {
+    editingCodeId = null;
+    editError = '';
+  }
+
+  async function handleEditSave(id) {
+    editSaving = true;
+    editError = '';
+    try {
+      const uses = editUsesRemaining !== '' ? parseInt(editUsesRemaining, 10) : null;
+      const expiry = editExpiresInHours !== '' ? parseFloat(editExpiresInHours) : null;
+      await updateCode(token, id, { usesRemaining: uses, expiresInHours: expiry });
+      editingCodeId = null;
+      // WS will trigger loadCodes(), but also refresh immediately for responsiveness
+      await loadCodes();
+    } catch (err) {
+      editError = err.message;
+    } finally {
+      editSaving = false;
+    }
+  }
+
   async function handleCopy(code, id) {
     await navigator.clipboard.writeText(code);
     copyFeedback = id;
@@ -92,7 +165,7 @@
 
   // Users management
   async function loadUsers() {
-    usersLoading = true;
+    if (users.length === 0) usersLoading = true;
     usersError = '';
     try {
       const filter = userFilter === 'all' ? null : userFilter;
@@ -194,7 +267,7 @@
           <p class="empty">No codes generated yet.</p>
         {:else}
           {#each codes as code (code.id)}
-            <div class="code-item" class:code-inactive={isExpired(code) || isDepleted(code)}>
+            <div class="code-item" class:code-inactive={isExpired(code) || isDepleted(code)} class:code-editing={editingCodeId === code.id}>
               <div class="code-main">
                 <span class="code-value">{code.code}</span>
                 <div class="code-meta">
@@ -213,11 +286,37 @@
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M9.5 4.5V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5A1.5 1.5 0 003 9.5h1.5" stroke="currentColor" stroke-width="1.2"/></svg>
                   {/if}
                 </button>
+                <button class="btn-icon btn-edit" class:btn-edit-active={editingCodeId === code.id} onclick={() => editingCodeId === code.id ? cancelEdit() : startEdit(code)} aria-label="Edit code">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                </button>
                 <button class="btn-icon btn-delete" onclick={() => handleDelete(code.id)} aria-label="Revoke code">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                 </button>
               </div>
             </div>
+            {#if editingCodeId === code.id}
+              <div class="edit-form">
+                <div class="edit-row">
+                  <div class="gen-field">
+                    <label class="field-label" for="edit-uses-{code.id}">USES (∞ = blank)</label>
+                    <input id="edit-uses-{code.id}" type="number" min="0" step="1" bind:value={editUsesRemaining} placeholder="∞" />
+                  </div>
+                  <div class="gen-field">
+                    <label class="field-label" for="edit-expiry-{code.id}">EXPIRY IN HOURS (blank = never)</label>
+                    <input id="edit-expiry-{code.id}" type="number" min="0.1" step="1" bind:value={editExpiresInHours} placeholder="Never" />
+                  </div>
+                </div>
+                {#if editError}
+                  <p class="edit-error">{editError}</p>
+                {/if}
+                <div class="edit-actions">
+                  <button class="btn-edit-save" disabled={editSaving} onclick={() => handleEditSave(code.id)}>
+                    {editSaving ? 'SAVING…' : 'SAVE'}
+                  </button>
+                  <button class="btn-edit-cancel" onclick={cancelEdit}>CANCEL</button>
+                </div>
+              </div>
+            {/if}
           {/each}
         {/if}
       </div>
@@ -552,6 +651,8 @@
   .btn-icon:active { transform: scale(0.88); }
 
   .btn-delete:hover { color: #c47070; }
+  .btn-edit:hover { color: #7b9cbf; }
+  .btn-edit-active { color: #7b9cbf; background: rgba(123, 156, 191, 0.1); }
 
   /* Tabs */
   .tab-bar {
@@ -719,4 +820,74 @@
   }
   .type-reg { background: rgba(123, 156, 191, 0.15); color: #7b9cbf; }
   .type-access { background: rgba(160, 140, 200, 0.15); color: #a08cc8; }
+
+  /* Inline code edit form */
+  .code-editing {
+    border-color: rgba(123, 156, 191, 0.25);
+  }
+
+  .edit-form {
+    padding: 0.75rem;
+    background: rgba(123, 156, 191, 0.06);
+    border: 1px solid rgba(123, 156, 191, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: -0.25rem;
+  }
+
+  .edit-form .field-label {
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  .edit-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    align-items: end;
+  }
+
+  .edit-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn-edit-save {
+    flex: 1;
+    padding: 0.5rem 0;
+    border: none;
+    border-radius: 0.6rem;
+    background: rgba(123, 156, 191, 0.18);
+    color: #7b9cbf;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+  }
+  .btn-edit-save:hover:not(:disabled) { background: rgba(123, 156, 191, 0.28); color: #a8c4df; }
+  .btn-edit-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-edit-cancel {
+    padding: 0.5rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0.6rem;
+    background: transparent;
+    color: #6c7585;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+  }
+  .btn-edit-cancel:hover { background: rgba(255, 255, 255, 0.04); color: #a4afbb; }
+
+  .edit-error {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: #c47070;
+    margin: 0;
+  }
 </style>

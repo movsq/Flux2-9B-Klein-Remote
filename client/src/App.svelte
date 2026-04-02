@@ -24,6 +24,7 @@
   let currentJobId = $state(null);
   let currentResult = $state(null);
   let wsError = $state('');
+  let codeUsesRemaining = $state(null); // null = not a code user or unlimited; 0 = depleted
   let showModal = $state(false);
   let showAdmin = $state(false);
   let showGallery = $state(false);
@@ -53,6 +54,7 @@
 
     ws.on('queued', ({ jobId }) => {
       currentJobId = jobId;
+      wsError = ''; // server accepted the job — dismiss any stale error banner
       console.log(`[app] Job queued: ${jobId}`);
     });
 
@@ -61,6 +63,7 @@
         console.log(`[app] Ignoring stale result for job ${msg.jobId}`);
         return;
       }
+      wsError = ''; // result arrived — any “PC not connected” banner is stale
       currentResult = msg;
       showModal = true;
     });
@@ -79,6 +82,19 @@
 
     ws.on('open', () => {
       wsError = '';
+    });
+
+    ws.on('code_refreshed', () => {
+      // Admin increased uses count — dismiss the stale "no remaining uses" error
+      if (wsError) wsError = '';
+    });
+
+    ws.on('code_status', ({ usesRemaining }) => {
+      codeUsesRemaining = usesRemaining; // null = unlimited
+      // If admin restored uses, also dismiss any stale error banner
+      if (usesRemaining === null || usesRemaining > 0) {
+        if (wsError) wsError = '';
+      }
     });
 
     ws.on('reconnect_failed', () => {
@@ -206,6 +222,7 @@
       onOpenGallery={handleOpenGallery}
       showVaultSettingsBtn={isGoogleUser && vaultInfo?.configured}
       onOpenVaultSettings={handleOpenVaultSettings}
+      {codeUsesRemaining}
     />
   {/if}
 
