@@ -4,10 +4,29 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
-import { initAuth, verifyPin, createSession, validateSession } from './auth.js';
+import {
+  initAuth,
+  verifyGoogleToken,
+  signJwt,
+  verifyJwt,
+  verifyPcSecret,
+  requireActive,
+  requireAdmin,
+} from './auth.js';
+import {
+  findUserByGoogleSub,
+  createUser,
+  getUserById,
+  validateInviteCode,
+  decrementCodeUses,
+  createInviteCode,
+  getCodesByCreator,
+  deleteInviteCode,
+} from './db.js';
 import {
   createJob,
   completeJob,
@@ -17,9 +36,6 @@ import {
 } from './jobs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// ── Auth state ────────────────────────────────────────────────────────────────
-// In-memory session store is handled inside auth.js.
 
 // ── PC relay state ────────────────────────────────────────────────────────────
 let pcSocket = null;
@@ -36,30 +52,101 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
-/** POST /auth — exchange PIN for a session token */
-app.post('/auth', async (req, res) => {
-  const { pin } = req.body ?? {};
-  if (typeof pin !== 'string') {
-    return res.status(400).json({ error: 'pin required' });
+/** POST /auth/google — exchange a Google ID token (+ optional invite code) for a JWT */
+app.post('/auth/google', async (req, res) => {
+  const { idToken, inviteCode } = req.body ?? {};
+  if (typeof idToken !== 'string') {
+    return res.status(400).json({ error: 'idToken required' });
   }
-  const ok = await verifyPin(pin);
-  if (!ok) {
-    return res.status(401).json({ error: 'Invalid PIN' });
+
+  let googleUser;
+  try {
+    googleUser = await verifyGoogleToken(idToken);
+  } catch {
+    return res.status(401).json({ error: 'Invalid Google token' });
   }
-  const token = createSession();
-  res.json({ token });
+
+  const existing = findUserByGoogleSub(googleUser.sub);
+
+  // ── Existing user ─────────────────────────────────────────────────────────
+  if (existing) {
+    if (existing.status === 'suspended') {
+      return res.status(403).json({ error: 'suspended' });
+    }
+    if (existing.status === 'pending') {
+      return res.status(200).json({ status: 'pending_approval', isNew: false });
+    }
+    // active
+    const token = signJwt({
+      userId: existing.id,
+      googleSub: existing.google_sub,
+      status: existing.status,
+      isAdmin: !!existing.is_admin,
+    });
+    return res.json({
+      token,
+      user: { name: existing.name, email: existing.email, status: existing.status, isAdmin: !!existing.is_admin },
+    });
+  }
+
+  // ── New user with invite code ─────────────────────────────────────────────
+  if (inviteCode) {
+    const code = validateInviteCode(inviteCode, 'registration');
+    if (!code) {
+      return res.status(400).json({ error: 'Invalid or expired invite code' });
+    }
+    const user = createUser({
+      googleSub: googleUser.sub,
+      email: googleUser.email,
+      name: googleUser.name,
+      picture: googleUser.picture,
+      status: 'active',
+    });
+    decrementCodeUses(code.id);
+    const token = signJwt({
+      userId: user.id,
+      googleSub: user.google_sub,
+      status: user.status,
+      isAdmin: !!user.is_admin,
+    });
+    return res.json({
+      token,
+      user: { name: user.name, email: user.email, status: user.status, isAdmin: !!user.is_admin },
+    });
+  }
+
+  // ── New user without invite code → pending ────────────────────────────────
+  createUser({
+    googleSub: googleUser.sub,
+    email: googleUser.email,
+    name: googleUser.name,
+    picture: googleUser.picture,
+    status: 'pending',
+  });
+  return res.status(200).json({ status: 'pending_approval', isNew: true });
+});
+
+/** GET /auth/me — return current user info from DB */
+app.get('/auth/me', (req, res) => {
+  const header = req.headers['authorization'] ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const payload = verifyJwt(token);
+  if (!payload) return res.status(401).json({ error: 'Unauthorized' });
+  const user = getUserById(payload.userId);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  res.json({
+    name: user.name,
+    email: user.email,
+    status: user.status,
+    isAdmin: !!user.is_admin,
+  });
 });
 
 /**
  * GET /pc-pubkey — serve the PC's cached public key so the phone can encrypt.
- * Requires a valid session (so random visitors can't probe the endpoint).
+ * Requires an active session.
  */
-app.get('/pc-pubkey', (req, res) => {
-  const header = req.headers['authorization'] ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!validateSession(token)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+app.get('/pc-pubkey', requireActive, (req, res) => {
   if (!pcPublicKeyB64) {
     return res.status(503).json({ error: 'PC not connected' });
   }
@@ -68,6 +155,59 @@ app.get('/pc-pubkey', (req, res) => {
 
 /** GET /health — simple liveness check */
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// ── Invite code management (admin only) ───────────────────────────────────────
+
+/** POST /codes — generate a new invite code */
+app.post('/codes', requireAdmin, (req, res) => {
+  const { type = 'registration', usesRemaining = 1, expiresInHours = null } = req.body ?? {};
+  if (!['registration', 'job_access'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid type' });
+  }
+
+  // Generate KLEIN-XXXX-XXXX format
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 to avoid confusion
+  const bytes = randomBytes(8);
+  let code = 'KLEIN-';
+  for (let i = 0; i < 8; i++) {
+    code += chars[bytes[i] % chars.length];
+    if (i === 3) code += '-';
+  }
+
+  const expiresAt = expiresInHours ? Date.now() + expiresInHours * 3600_000 : null;
+
+  createInviteCode({
+    code,
+    type,
+    createdBy: req.user.userId,
+    usesRemaining: usesRemaining ?? null,
+    expiresAt,
+  });
+
+  res.json({ code, type, usesRemaining, expiresAt });
+});
+
+/** GET /codes — list codes created by this admin */
+app.get('/codes', requireAdmin, (req, res) => {
+  const codes = getCodesByCreator(req.user.userId);
+  res.json(codes.map(c => ({
+    id: c.id,
+    code: c.code,
+    type: c.type,
+    usesRemaining: c.uses_remaining,
+    expiresAt: c.expires_at,
+    createdAt: c.created_at,
+  })));
+});
+
+/** DELETE /codes/:id — revoke a code */
+app.delete('/codes/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+  const result = deleteInviteCode(id, req.user.userId);
+  if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
+  res.json({ ok: true });
+});
 
 // Serve the built Svelte client in production (local dev only — Caddy serves it on VPS).
   const clientDist = process.env.CLIENT_DIST_PATH || join(__dirname, '../../client/dist');
@@ -92,8 +232,15 @@ server.on('upgrade', async (req, socket, head) => {
 
   if (url.pathname === '/ws/phone') {
     const token = url.searchParams.get('token');
-    if (!validateSession(token)) {
+    const payload = verifyJwt(token);
+    if (!payload) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    const user = getUserById(payload.userId);
+    if (!user || user.status !== 'active') {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -124,15 +271,15 @@ async function handlePcSocket(ws) {
       return;
     }
 
-    if (msg.type !== 'auth' || typeof msg.pin !== 'string') {
+    if (msg.type !== 'auth' || typeof msg.secret !== 'string') {
       ws.close(4002, 'Expected auth message');
       return;
     }
 
-    const ok = await verifyPin(msg.pin);
+    const ok = verifyPcSecret(msg.secret);
     if (!ok) {
-      console.warn('[pc] Wrong PIN.');
-      ws.close(4003, 'Invalid PIN');
+      console.warn('[pc] Wrong secret.');
+      ws.close(4003, 'Invalid secret');
       return;
     }
 
@@ -262,7 +409,7 @@ function handleJobSubmit(phoneWs, msg) {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-await initAuth();
+initAuth();
 
 // Prune stale jobs every 10 minutes
 setInterval(() => pruneOldJobs(30 * 60 * 1000), 10 * 60 * 1000);

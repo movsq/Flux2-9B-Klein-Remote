@@ -1,61 +1,128 @@
-import bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
+import { timingSafeEqual } from 'crypto';
+import { getUserById } from './db.js';
 
-// PIN hash is computed once at startup from the env var.
-let pinHash = null;
-
-// In-memory session token store: token → { createdAt }
-const sessions = new Map();
-
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const JWT_SECRET = process.env.JWT_SECRET;
+const PC_SECRET = process.env.PC_SECRET;
 const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS ?? '86400000', 10);
 
-export async function initAuth() {
-  const pin = process.env.PIN;
-  if (!pin || pin === 'changeme') {
-    console.warn(
-      '[auth] WARNING: PIN is not set or is still "changeme". Set PIN in your .env file.',
-    );
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+export function initAuth() {
+  if (!GOOGLE_CLIENT_ID) {
+    console.warn('[auth] WARNING: GOOGLE_CLIENT_ID is not set. Google OAuth will fail.');
   }
-  pinHash = await bcrypt.hash(pin ?? 'changeme', 12);
-  console.log('[auth] PIN hash initialized.');
-}
-
-export async function verifyPin(candidate) {
-  if (!pinHash) throw new Error('Auth not initialized');
-  return bcrypt.compare(candidate, pinHash);
-}
-
-export function createSession() {
-  const token = randomBytes(32).toString('hex');
-  sessions.set(token, { createdAt: Date.now() });
-  return token;
-}
-
-export function validateSession(token) {
-  if (!token) return false;
-  const session = sessions.get(token);
-  if (!session) return false;
-  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
-    sessions.delete(token);
-    return false;
+  if (!JWT_SECRET) {
+    throw new Error('[auth] JWT_SECRET must be set in .env');
   }
-  return true;
+  if (!PC_SECRET || PC_SECRET === 'changeme') {
+    console.warn('[auth] WARNING: PC_SECRET is not set or is still "changeme".');
+  }
+  console.log('[auth] Initialized.');
 }
 
-export function deleteSession(token) {
-  sessions.delete(token);
+// ── Google OAuth ──────────────────────────────────────────────────────────────
+
+export async function verifyGoogleToken(idToken) {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: GOOGLE_CLIENT_ID,
+  });
+  const payload = ticket.getPayload();
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    name: payload.name ?? '',
+    picture: payload.picture ?? '',
+  };
+}
+
+// ── JWT ───────────────────────────────────────────────────────────────────────
+
+export function signJwt({ userId, googleSub, status, isAdmin }) {
+  return jwt.sign(
+    { userId, googleSub, status, isAdmin },
+    JWT_SECRET,
+    { expiresIn: Math.floor(SESSION_TTL_MS / 1000) },
+  );
+}
+
+export function verifyJwt(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+// ── PC secret ─────────────────────────────────────────────────────────────────
+
+export function verifyPcSecret(candidate) {
+  if (!PC_SECRET || typeof candidate !== 'string') return false;
+  const a = Buffer.from(PC_SECRET);
+  const b = Buffer.from(candidate);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+// ── Express middleware ────────────────────────────────────────────────────────
+
+function extractToken(req) {
+  const header = req.headers['authorization'] ?? '';
+  return header.startsWith('Bearer ') ? header.slice(7) : null;
 }
 
 /**
- * Express middleware — rejects requests without a valid session token.
- * Token is expected in the Authorization header as "Bearer <token>".
+ * Requires a valid JWT. Attaches req.user with { userId, googleSub, status, isAdmin }.
  */
-export function requireSession(req, res, next) {
-  const header = req.headers['authorization'] ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!validateSession(token)) {
+export function requireAuth(req, res, next) {
+  const token = extractToken(req);
+  const payload = verifyJwt(token);
+  if (!payload) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  req.sessionToken = token;
+  req.user = payload;
+  next();
+}
+
+/**
+ * Requires a valid JWT AND status === 'active'.
+ * Re-checks the DB so status changes take effect immediately.
+ */
+export function requireActive(req, res, next) {
+  const token = extractToken(req);
+  const payload = verifyJwt(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const user = getUserById(payload.userId);
+  if (!user || user.status !== 'active') {
+    return res.status(403).json({ error: 'Account not active' });
+  }
+  req.user = { ...payload, status: user.status, isAdmin: !!user.is_admin };
+  next();
+}
+
+/**
+ * Requires a valid JWT, active status, AND admin flag.
+ */
+export function requireAdmin(req, res, next) {
+  const token = extractToken(req);
+  const payload = verifyJwt(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const user = getUserById(payload.userId);
+  if (!user || user.status !== 'active') {
+    return res.status(403).json({ error: 'Account not active' });
+  }
+  if (!user.is_admin) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  req.user = { ...payload, status: user.status, isAdmin: true };
   next();
 }

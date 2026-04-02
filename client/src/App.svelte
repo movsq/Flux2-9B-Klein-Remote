@@ -2,6 +2,7 @@
   import Login from './components/Login.svelte';
   import Submit from './components/Submit.svelte';
   import Result from './components/Result.svelte';
+  import Admin from './components/Admin.svelte';
   import { createPhoneWS } from './lib/ws.js';
   import { onDestroy } from 'svelte';
 
@@ -11,6 +12,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   let token = $state(null);
+  let user = $state(null);       // { name, email, status, isAdmin }
   let ws = $state(null);
   let view = $state('login');        // 'login' | 'submit'
   let currentAesKey = $state(null);
@@ -18,14 +20,16 @@
   let currentResult = $state(null);
   let wsError = $state('');
   let showModal = $state(false);
+  let showAdmin = $state(false);
 
   // Seed + mode are owned here so they survive cycles
   let seed = $state(randomSeed());
   let seedMode = $state('randomize');
 
   // ── Login ──────────────────────────────────────────────────────────────────
-  function handleLogin(newToken) {
+  function handleLogin(newToken, newUser) {
     token = newToken;
+    user = newUser;
     view = 'submit';
 
     ws = createPhoneWS(token);
@@ -64,11 +68,13 @@
       ws.close();
       ws = null;
       token = null;
+      user = null;
       currentAesKey = null;
       currentJobId = null;
       currentResult = null;
       wsError = '';
       showModal = false;
+      showAdmin = false;
       view = 'login';
     });
   }
@@ -114,11 +120,17 @@
       previewResult={currentResult}
       onPreview={() => showModal = true}
       onNewJob={handleDone}
+      isAdmin={user?.isAdmin}
+      onOpenAdmin={() => showAdmin = true}
     />
   {/if}
 
   {#if showModal && currentResult}
     <Result result={currentResult} aesKey={currentAesKey} onDone={handleDone} onClose={handleClose} />
+  {/if}
+
+  {#if showAdmin && user?.isAdmin}
+    <Admin {token} onClose={() => showAdmin = false} />
   {/if}
 </div>
 

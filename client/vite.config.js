@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/auth': `http://localhost:${PORT}`,
         '/pc-pubkey': `http://localhost:${PORT}`,
+        '/codes': `http://localhost:${PORT}`,
         '/health': `http://localhost:${PORT}`,
         '/ws': {
           target: `ws://localhost:${PORT}`,

@@ -39,8 +39,10 @@ else:  # local
 
 _log.info("VPS_URL resolved to %s (DEPLOY_MODE=%s)", VPS_URL, _MODE)
 
-# The PIN that matches the PIN set on the server.
-PIN: str = os.environ.get("PIN", "changeme")
+# The secret that matches PC_SECRET on the server.
+PC_SECRET: str = os.environ.get("PC_SECRET") or os.environ.get("PIN", "changeme")
+if os.environ.get("PIN") and not os.environ.get("PC_SECRET"):
+    _log.warning("PIN is deprecated for PC auth — set PC_SECRET in .env instead")
 
 # ── TLS verification ───────────────────────────────────────────────────────────
 # Set SKIP_TLS_VERIFY=true in .env for Tailscale self-signed certs.

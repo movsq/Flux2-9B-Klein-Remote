@@ -1,52 +1,189 @@
 <script>
-  import { login } from '../lib/api.js';
+  import { loginWithGoogle } from '../lib/api.js';
 
   let { onLogin } = $props();
 
-  let pin = $state('');
   let error = $state('');
   let loading = $state(false);
+  let step = $state('google');  // 'google' | 'invite' | 'pending'
+  let hasCode = $state(false);
+  let inviteCode = $state('');
+  let googleIdToken = $state(null);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  // Wait for Google Identity Services to load, then initialize
+  let gsiReady = $state(false);
+
+  $effect(() => {
+    if (typeof google !== 'undefined' && google.accounts) {
+      initGsi();
+    } else {
+      const interval = setInterval(() => {
+        if (typeof google !== 'undefined' && google.accounts) {
+          clearInterval(interval);
+          initGsi();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  });
+
+  function initGsi() {
+    google.accounts.id.initialize({
+      // @ts-ignore — GOOGLE_CLIENT_ID is injected by Vite from .env
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+      auto_select: false,
+    });
+    gsiReady = true;
+  }
+
+  function renderGoogleButton(node) {
+    // Re-render when gsiReady changes
+    if (!gsiReady) return;
+    google.accounts.id.renderButton(node, {
+      type: 'standard',
+      theme: 'filled_black',
+      size: 'large',
+      width: 260,
+      text: 'signin_with',
+      shape: 'pill',
+    });
+  }
+
+  async function handleGoogleCredential(response) {
+    const idToken = response.credential;
+    googleIdToken = idToken;
     error = '';
     loading = true;
+
     try {
-      const token = await login(pin);
-      onLogin(token);
+      const data = await loginWithGoogle(idToken);
+
+      if (data.status === 'pending_approval') {
+        step = data.isNew === false ? 'pending' : 'invite';
+        loading = false;
+        return;
+      }
+
+      if (data.token) {
+        onLogin(data.token, data.user);
+        return;
+      }
+    } catch (err) {
+      // If this is a new user, the server returns pending_approval as 200
+      // but let's also handle invite code flow on error
+      error = err.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function handleInviteSubmit(e) {
+    e.preventDefault();
+    if (!inviteCode.trim() || !googleIdToken) return;
+    error = '';
+    loading = true;
+
+    try {
+      const data = await loginWithGoogle(googleIdToken, inviteCode.trim());
+      if (data.token) {
+        onLogin(data.token, data.user);
+        return;
+      }
+      if (data.status === 'pending_approval') {
+        step = 'pending';
+      }
     } catch (err) {
       error = err.message;
     } finally {
       loading = false;
     }
   }
+
+  function handleRegisterWithoutCode() {
+    step = 'pending';
+  }
 </script>
 
 <div class="login-bg">
-  <form onsubmit={handleSubmit} class="login-card">
-    <div class="brand">
-      <span class="brand-title">ComfyLink</span>
-      <span class="brand-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+  {#if step === 'google'}
+    <div class="login-card">
+      <div class="brand">
+        <span class="brand-title">ComfyLink</span>
+        <span class="brand-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+      </div>
+
+      <div class="google-btn-wrap">
+        {#if gsiReady}
+          <div use:renderGoogleButton></div>
+        {:else}
+          <div class="loading-placeholder">Loading…</div>
+        {/if}
+      </div>
+
+      {#if error}
+        <p class="error">{error}</p>
+      {/if}
     </div>
 
-    <input
-      type="password"
-      placeholder="Enter PIN"
-      autocomplete="current-password"
-      inputmode="numeric"
-      bind:value={pin}
-      disabled={loading}
-      required
-    />
+  {:else if step === 'invite'}
+    <form class="login-card" onsubmit={handleInviteSubmit}>
+      <div class="brand">
+        <span class="brand-title">ComfyLink</span>
+        <span class="brand-sub">COMPLETE REGISTRATION</span>
+      </div>
 
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
+      <p class="invite-prompt">Do you have an invite code?</p>
 
-    <button type="submit" disabled={loading || !pin}>
-      {loading ? 'VERIFYING…' : 'ACCESS'}
-    </button>
-  </form>
+      <label class="checkbox-row">
+        <input type="checkbox" bind:checked={hasCode} />
+        <span class="checkbox-label">Yes, I have a code</span>
+      </label>
+
+      {#if hasCode}
+        <input
+          type="text"
+          placeholder="KLEIN-XXXX-XXXX"
+          autocomplete="off"
+          spellcheck="false"
+          bind:value={inviteCode}
+          disabled={loading}
+          class="code-input"
+        />
+        <button type="submit" disabled={loading || !inviteCode.trim()}>
+          {loading ? 'VERIFYING…' : 'ACTIVATE'}
+        </button>
+      {:else}
+        <button type="button" class="btn-secondary" onclick={handleRegisterWithoutCode} disabled={loading}>
+          REGISTER WITHOUT CODE
+        </button>
+      {/if}
+
+      {#if error}
+        <p class="error">{error}</p>
+      {/if}
+    </form>
+
+  {:else if step === 'pending'}
+    <div class="login-card">
+      <div class="brand">
+        <span class="brand-title">ComfyLink</span>
+        <span class="brand-sub">REGISTRATION SUBMITTED</span>
+      </div>
+
+      <div class="pending-msg">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="#7b9cbf" stroke-width="1.5"/>
+          <path d="M12 7v5l3 3" stroke="#7b9cbf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Your account is pending admin approval. You'll be able to sign in once approved.</p>
+      </div>
+
+      <button type="button" onclick={() => { step = 'google'; error = ''; }}>
+        BACK TO SIGN IN
+      </button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -63,7 +200,7 @@
     flex-direction: column;
     gap: 1.25rem;
     width: 100%;
-    max-width: 300px;
+    max-width: 320px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 1.25rem;
@@ -97,7 +234,75 @@
     font-weight: 400;
   }
 
-  input {
+  .google-btn-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 0.25rem 0;
+  }
+
+  .loading-placeholder {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: #6c7585;
+    letter-spacing: 0.05em;
+    padding: 0.8rem 0;
+  }
+
+  .invite-prompt {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: #a4afbb;
+    margin: 0;
+    text-align: center;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    padding: 0.25rem 0;
+  }
+
+  .checkbox-row input[type='checkbox'] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .checkbox-row input[type='checkbox']:checked {
+    border-color: #7b9cbf;
+    background: rgba(123, 156, 191, 0.2);
+  }
+
+  .checkbox-row input[type='checkbox']:checked::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 4px;
+    height: 8px;
+    border: solid #7b9cbf;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+  }
+
+  .checkbox-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: #a4afbb;
+    letter-spacing: 0.02em;
+  }
+
+  .code-input {
     padding: 0.72rem 1rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 0.75rem;
@@ -108,14 +313,17 @@
     outline: none;
     transition: border-color 0.2s;
     letter-spacing: 0.12em;
+    text-transform: uppercase;
+    width: 100%;
   }
 
-  input::placeholder {
+  .code-input::placeholder {
     color: #6c7585;
     letter-spacing: 0.05em;
+    text-transform: none;
   }
 
-  input:focus {
+  .code-input:focus {
     border-color: rgba(123, 156, 191, 0.5);
   }
 
@@ -147,6 +355,33 @@
     cursor: not-allowed;
   }
 
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #c2ccd5;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.11);
+    color: #e4e4e7;
+  }
+
+  .pending-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+  }
+
+  .pending-msg p {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: #8b96a6;
+    line-height: 1.6;
+    margin: 0;
+  }
+
   .error {
     font-family: 'DM Mono', monospace;
     color: #c47070;
@@ -156,6 +391,6 @@
   }
 
   @media (hover: none) and (pointer: coarse) {
-    input { font-size: 16px !important; }
+    .code-input { font-size: 16px !important; }
   }
 </style>

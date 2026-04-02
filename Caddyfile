@@ -23,6 +23,9 @@
     handle /health* {
         reverse_proxy server:3000
     }
+    handle /codes* {
+        reverse_proxy server:3000
+    }
 
     # ── Frontend → static files built by Vite ─────────────────────────────────
     handle {

@@ -9,7 +9,7 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob } = $props();
+  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin } = $props();
 
   // ── Per-form local state ──────────────────────────────────────────────
   let imageFile1 = $state(null);
@@ -523,8 +523,22 @@
   >
     <form onsubmit={handleSubmit} class="form">
       <div class="form-header">
-        <span class="form-title">ComfyLink</span>
-        <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+        <div class="form-header-left">
+          <span class="form-title">ComfyLink</span>
+          <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
+        </div>
+        {#if isAdmin}
+          <button type="button" class="btn-admin" onclick={onOpenAdmin} aria-label="Admin panel">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
+              <circle cx="10" cy="17" r="1.2" fill="currentColor"/>
+              <circle cx="3" cy="10" r="1.2" fill="currentColor"/>
+              <circle cx="17" cy="10" r="1.2" fill="currentColor"/>
+            </svg>
+          </button>
+        {/if}
       </div>
 
       <!-- Images -->
@@ -723,10 +737,35 @@
 
   .form-header {
     display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+    align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 0.2rem;
   }
+
+  .form-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .btn-admin {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #8b96a6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+  }
+
+  .btn-admin:hover { background: rgba(255, 255, 255, 0.1); color: #7b9cbf; }
+  .btn-admin:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .form-title {
     font-family: 'Syne', sans-serif;
