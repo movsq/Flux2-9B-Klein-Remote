@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus, updateUserUses } from '../lib/api.js';
 
   let { token, onClose } = $props();
@@ -101,7 +102,7 @@
   }
 
   // Load codes on mount, connect admin WS
-  $effect(() => {
+  onMount(() => {
     loadCodes();
     connectAdminWS();
     return () => {
