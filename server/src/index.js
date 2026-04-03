@@ -40,6 +40,7 @@ import {
   deleteStoredResult,
   getAllUsers,
   updateUserStatus,
+  updateUserUses,
 } from './db.js';
 import {
   createJob,
@@ -85,7 +86,26 @@ function notifyCodeUsers(codeId, usesRemaining) {
     sendJson(ws, { type: 'code_status', usesRemaining });
   }
 }
+// ── Google-user phone socket tracking ───────────────────────────────────────────────
+// Map<userId, Set<WebSocket>> — live connections authenticated as Google users
+const phoneUserSockets = new Map();
 
+function registerUserSocket(userId, ws) {
+  if (!phoneUserSockets.has(userId)) phoneUserSockets.set(userId, new Set());
+  phoneUserSockets.get(userId).add(ws);
+}
+
+function unregisterUserSocket(userId, ws) {
+  phoneUserSockets.get(userId)?.delete(ws);
+}
+
+function notifyUserSockets(userId, usesRemaining) {
+  const sockets = phoneUserSockets.get(userId);
+  if (!sockets) return;
+  for (const ws of sockets) {
+    sendJson(ws, { type: 'uses_updated', usesRemaining });
+  }
+}
 function sendJson(ws, obj) {
   if (ws.readyState === 1 /* OPEN */) {
     ws.send(JSON.stringify(obj));
@@ -140,7 +160,7 @@ app.post('/auth/google', async (req, res) => {
     });
     return res.json({
       token,
-      user: { name: existing.name, email: existing.email, status: existing.status, isAdmin: !!existing.is_admin },
+      user: { name: existing.name, email: existing.email, status: existing.status, isAdmin: !!existing.is_admin, usesRemaining: existing.uses_remaining ?? null },
     });
   }
 
@@ -168,7 +188,7 @@ app.post('/auth/google', async (req, res) => {
     });
     return res.json({
       token,
-      user: { name: user.name, email: user.email, status: user.status, isAdmin: !!user.is_admin },
+      user: { name: user.name, email: user.email, status: user.status, isAdmin: !!user.is_admin, usesRemaining: user.uses_remaining ?? null },
     });
   }
 
@@ -195,6 +215,7 @@ app.get('/auth/me', (req, res) => {
     email: user.email,
     status: user.status,
     isAdmin: !!user.is_admin,
+    usesRemaining: user.uses_remaining ?? null,
   });
 });
 
@@ -496,18 +517,20 @@ app.get('/admin/users', requireAdmin, (req, res) => {
     picture: u.picture,
     status: u.status,
     isAdmin: !!u.is_admin,
+    usesRemaining: u.uses_remaining ?? null,
     createdAt: u.created_at,
   })));
 });
 
-/** PATCH /admin/users/:id — update user status */
+/** PATCH /admin/users/:id — update user status and/or uses remaining */
 app.patch('/admin/users/:id', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { status } = req.body ?? {};
-  if (!['active', 'suspended'].includes(status)) {
-    return res.status(400).json({ error: 'status must be active or suspended' });
+  const { status, usesRemaining } = req.body ?? {};
+
+  if (status === undefined && usesRemaining === undefined) {
+    return res.status(400).json({ error: 'Nothing to update' });
   }
 
   // Cannot modify own account
@@ -523,7 +546,24 @@ app.patch('/admin/users/:id', requireAdmin, (req, res) => {
     return res.status(403).json({ error: 'Cannot modify another admin' });
   }
 
-  updateUserStatus(id, status);
+  if (status !== undefined) {
+    if (!['active', 'suspended'].includes(status)) {
+      return res.status(400).json({ error: 'status must be active or suspended' });
+    }
+    updateUserStatus(id, status);
+  }
+
+  if (usesRemaining !== undefined) {
+    if (usesRemaining !== null) {
+      const n = Number(usesRemaining);
+      if (!Number.isInteger(n) || n < 0 || n > 999_999) {
+        return res.status(400).json({ error: 'usesRemaining must be null or an integer 0–999999' });
+      }
+    }
+    updateUserUses(id, usesRemaining);
+    notifyUserSockets(id, usesRemaining ?? null);
+  }
+
   notifyAdmins('users_changed');
   res.json({ ok: true });
 });
@@ -710,6 +750,11 @@ function handlePhoneSocket(ws, jwtPayload) {
     // Send initial code status so the client can show a warning immediately
     const codeRow = findInviteCodeById(jwtPayload.codeId);
     if (codeRow) sendJson(ws, { type: 'code_status', usesRemaining: codeRow.uses_remaining });
+  } else if (jwtPayload.userId) {
+    registerUserSocket(jwtPayload.userId, ws);
+    // Send initial uses status so the client reflects current quota immediately
+    const userRow = getUserById(jwtPayload.userId);
+    if (userRow) sendJson(ws, { type: 'uses_updated', usesRemaining: userRow.uses_remaining ?? null });
   }
 
   ws.on('message', (raw) => {
@@ -738,6 +783,8 @@ function handlePhoneSocket(ws, jwtPayload) {
   ws.on('close', () => {
     if (jwtPayload.type === 'code_user') {
       unregisterCodeSocket(jwtPayload.codeId, ws);
+    } else if (jwtPayload.userId) {
+      unregisterUserSocket(jwtPayload.userId, ws);
     }
     console.log('[phone] Disconnected.');
   });
@@ -763,6 +810,26 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
     return;
   }
   phoneWs._lastSubmit = { hash: payloadHash, at: now };
+
+  // ── Google user quota check ────────────────────────────────────────────────────
+  if (jwtPayload?.type !== 'code_user' && jwtPayload?.userId) {
+    const userRow = getUserById(jwtPayload.userId);
+    if (!userRow) {
+      sendJson(phoneWs, { type: 'error', message: 'User not found' });
+      return;
+    }
+    if (userRow.uses_remaining === 0) {
+      sendJson(phoneWs, { type: 'error', message: 'no_uses_remaining' });
+      return;
+    }
+    if (userRow.uses_remaining !== null) {
+      // Finite quota — decrement and propagate
+      updateUserUses(jwtPayload.userId, userRow.uses_remaining - 1);
+      notifyAdmins('users_changed');
+      notifyUserSockets(jwtPayload.userId, userRow.uses_remaining - 1);
+    }
+    // null = unlimited — proceed without decrement
+  }
 
   if (jwtPayload?.type === 'code_user') {
     const codeRow = findInviteCodeById(jwtPayload.codeId);

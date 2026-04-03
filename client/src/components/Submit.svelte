@@ -9,9 +9,10 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null } = $props();
+  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null, userUsesRemaining = null } = $props();
 
   let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
+  let userDepleted = $derived(userUsesRemaining !== null && userUsesRemaining === 0);
 
   // ── Per-form local state ──────────────────────────────────────────────
   let imageFile1 = $state(null);
@@ -745,6 +746,10 @@
         <p class="code-depleted">Access code has no remaining uses</p>
       {/if}
 
+      {#if userDepleted}
+        <p class="code-depleted">No uses remaining — contact an admin to get more</p>
+      {/if}
+
       <!-- Generate row -->
       <div class="generate-row">
         {#if status === 'sent' && previewResult}
@@ -767,7 +772,7 @@
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         {:else}
-          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting' || codeDepleted}>
+          <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting' || codeDepleted || userDepleted}>
             {status === 'encrypting' ? 'ENCRYPTING...' : 'GENERATE'}
           </button>
         {/if}

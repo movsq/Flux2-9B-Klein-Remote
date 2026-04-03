@@ -151,7 +151,18 @@ Users authenticate with **Google OAuth** (ID token flow — no server-side redir
 
 New accounts start as `pending` **unless** the user supplies a `registration` invite code at sign-in,
 in which case they are immediately set to `active`.
+### Per-user AI use quota
 
+Each Google account has a **uses remaining** quota:
+
+| Value | Meaning |
+|-------|---------|
+| `0` | No access — job submission is blocked until an admin grants uses |
+| *N* (positive integer) | User may submit *N* more jobs; decrements by 1 on each successful submission |
+| `null` / Unlimited | No limit — user may submit jobs freely |
+
+New accounts always start with **0 uses**. An admin must grant uses before the user can submit their first job.
+Existing accounts (created before this feature) are migrated to **Unlimited** automatically.
 ### Admin invite codes
 
 Admins can generate two types of invite code from the **Admin panel** (or via the REST API):
@@ -218,10 +229,13 @@ Accessible from the UI when logged in with an admin account. Two tabs:
 - Patch remaining uses or expiry on existing codes
 - Changes push immediately to connected admin and code-user sockets
 
-**USERS** — view all user accounts and change their status.
+**USERS** — view all user accounts, change their status, and manage their job quota.
 
 - Filter by status (`pending`, `active`, `suspended`)
 - Activate pending users or suspend active ones
+- Set a user's **uses remaining**: choose *Unlimited* or enter any number 0–999,999
+- Uses count is shown per row (highlighted amber when zero)
+- Changes to uses are pushed to the user's live socket in real-time
 - Cannot modify your own account or other admins
 
 ---
@@ -393,6 +407,7 @@ All messages are JSON. The `payload` field is a base64 binary blob the server ne
 | Server → Phone | `{ type: "error", jobId: "...", message: "..." }` |
 | Phone → Server | `{ type: "cancel", jobId: "..." }` |
 | Server → Phone | `{ type: "code_status", usesRemaining: N }` — code_user sessions only |
+| Server → Phone | `{ type: "uses_updated", usesRemaining: N\|null }` — Google user quota changed |
 
 ### Admin ↔ Server (`/ws/admin?token=<jwt>`)
 
@@ -416,8 +431,8 @@ All messages are JSON. The `payload` field is a base64 binary blob the server ne
 | `GET` | `/codes` | admin | List codes created by this admin |
 | `DELETE` | `/codes/:id` | admin | Revoke an invite code |
 | `PATCH` | `/codes/:id` | admin | Edit code uses remaining or expiry |
-| `GET` | `/admin/users` | admin | List all users (filterable by status) |
-| `PATCH` | `/admin/users/:id` | admin | Change a user's status (`active` / `suspended`) |
+| `GET` | `/admin/users` | admin | List all users (filterable by status), includes `usesRemaining` per user |
+| `PATCH` | `/admin/users/:id` | admin | Change a user's `status` (`active`/`suspended`) and/or `usesRemaining` (`null`=unlimited, 0–999999) |
 | `POST` | `/vault/setup` | active | Initialise vault with wrapped key blobs |
 | `GET` | `/vault/info` | active | Get vault configuration and salts |
 | `POST` | `/vault/unlock` | active | Retrieve a wrapped master key blob |

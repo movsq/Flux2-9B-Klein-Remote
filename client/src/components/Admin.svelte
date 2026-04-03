@@ -1,5 +1,5 @@
 <script>
-  import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus } from '../lib/api.js';
+  import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus, updateUserUses } from '../lib/api.js';
 
   let { token, onClose } = $props();
 
@@ -30,6 +30,13 @@
   let usersError = $state('');
   let userFilter = $state('all'); // 'all' | 'pending' | 'active' | 'suspended'
   let updatingUserId = $state(null);
+
+  // User uses editing state
+  let editingUsesId = $state(null);
+  let editUserUses = $state('');
+  let editUserUnlimited = $state(false);
+  let editUsesSaving = $state(false);
+  let editUsesError = $state('');
 
   // ── Admin WebSocket for real-time updates ──────────────────────────────────
   let adminWs = null;
@@ -192,6 +199,37 @@
     }
   }
 
+  function startEditUses(u) {
+    editingUsesId = u.id;
+    editUserUnlimited = u.usesRemaining === null;
+    editUserUses = u.usesRemaining !== null ? String(u.usesRemaining) : '';
+    editUsesError = '';
+  }
+
+  function cancelEditUses() {
+    editingUsesId = null;
+    editUsesError = '';
+  }
+
+  async function handleSaveUses(userId) {
+    editUsesSaving = true;
+    editUsesError = '';
+    try {
+      const uses = editUserUnlimited ? null : parseInt(editUserUses, 10);
+      if (!editUserUnlimited && (isNaN(uses) || uses < 0 || uses > 999999)) {
+        editUsesError = 'Enter a number 0–999999';
+        return;
+      }
+      await updateUserUses(token, userId, uses);
+      editingUsesId = null;
+      await loadUsers();
+    } catch (err) {
+      editUsesError = err.message;
+    } finally {
+      editUsesSaving = false;
+    }
+  }
+
   function switchTab(tab) {
     activeTab = tab;
     error = '';
@@ -344,31 +382,62 @@
           <p class="empty">No users found.</p>
         {:else}
           {#each users as u (u.id)}
-            <div class="user-item">
-              <div class="user-main">
-                <span class="user-email">{u.email}</span>
-                <div class="user-meta">
-                  <span class="status-badge" class:status-active={u.status === 'active'} class:status-pending={u.status === 'pending'} class:status-rejected={u.status === 'suspended'}>
-                    {u.status.toUpperCase()}
-                  </span>
-                  {#if u.isAdmin}
-                    <span class="role-badge">ADMIN</span>
-                  {/if}
-                  <span class="user-date">{formatUserDate(u.createdAt)}</span>
+            <div class="user-row-wrap">
+              <div class="user-item" class:user-item-editing={editingUsesId === u.id}>
+                <div class="user-main">
+                  <span class="user-email">{u.email}</span>
+                  <div class="user-meta">
+                    <span class="status-badge" class:status-active={u.status === 'active'} class:status-pending={u.status === 'pending'} class:status-rejected={u.status === 'suspended'}>
+                      {u.status.toUpperCase()}
+                    </span>
+                    {#if u.isAdmin}
+                      <span class="role-badge">ADMIN</span>
+                    {/if}
+                    <span class="uses-badge" class:uses-zero={u.usesRemaining === 0 && !u.isAdmin}>
+                      {u.usesRemaining === null ? '∞ uses' : `${u.usesRemaining} uses`}
+                    </span>
+                    <span class="user-date">{formatUserDate(u.createdAt)}</span>
+                  </div>
                 </div>
+                {#if !u.isAdmin}
+                  <div class="user-actions">
+                    <button class="btn-icon btn-edit" class:btn-edit-active={editingUsesId === u.id} onclick={() => editingUsesId === u.id ? cancelEditUses() : startEditUses(u)} aria-label="Set uses">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                    </button>
+                    {#if u.status !== 'active'}
+                      <button class="btn-small btn-approve" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'active')}>
+                        ✓
+                      </button>
+                    {/if}
+                    {#if u.status !== 'suspended'}
+                      <button class="btn-small btn-reject" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'suspended')}>
+                        ✕
+                      </button>
+                    {/if}
+                  </div>
+                {/if}
               </div>
-              {#if !u.isAdmin}
-                <div class="user-actions">
-                  {#if u.status !== 'active'}
-                    <button class="btn-small btn-approve" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'active')}>
-                      ✓
-                    </button>
+              {#if editingUsesId === u.id}
+                <div class="uses-edit-form">
+                  <label class="uses-unlimited-label">
+                    <input type="checkbox" bind:checked={editUserUnlimited} />
+                    <span>UNLIMITED</span>
+                  </label>
+                  {#if !editUserUnlimited}
+                    <div class="gen-field">
+                      <label class="field-label" for="edit-uses-{u.id}">USES (0–999999)</label>
+                      <input id="edit-uses-{u.id}" type="number" min="0" max="999999" step="1" bind:value={editUserUses} placeholder="0" />
+                    </div>
                   {/if}
-                  {#if u.status !== 'suspended'}
-                    <button class="btn-small btn-reject" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'suspended')}>
-                      ✕
-                    </button>
+                  {#if editUsesError}
+                    <p class="edit-error">{editUsesError}</p>
                   {/if}
+                  <div class="edit-actions">
+                    <button class="btn-edit-save" disabled={editUsesSaving} onclick={() => handleSaveUses(u.id)}>
+                      {editUsesSaving ? 'SAVING…' : 'SAVE'}
+                    </button>
+                    <button class="btn-edit-cancel" onclick={cancelEditUses}>CANCEL</button>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -783,6 +852,65 @@
   .btn-approve:hover { background: rgba(100, 180, 100, 0.15); }
   .btn-reject { color: #c47070; }
   .btn-reject:hover { background: rgba(196, 112, 112, 0.15); }
+
+  /* User row wrapper + uses editing */
+  .user-row-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .user-item-editing {
+    border-color: rgba(123, 156, 191, 0.25);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .uses-badge {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: #8b96a6;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .uses-zero {
+    background: rgba(200, 168, 75, 0.12);
+    color: #c8a84b;
+  }
+
+  .uses-edit-form {
+    padding: 0.75rem;
+    background: rgba(123, 156, 191, 0.06);
+    border: 1px solid rgba(123, 156, 191, 0.15);
+    border-top: none;
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .uses-unlimited-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    color: #7b9cbf;
+    user-select: none;
+  }
+
+  .uses-unlimited-label input[type='checkbox'] {
+    accent-color: #7b9cbf;
+    width: 0.9rem;
+    height: 0.9rem;
+    cursor: pointer;
+  }
 
   @media (hover: none) and (pointer: coarse) {
     input[type='number'] { font-size: 16px !important; }

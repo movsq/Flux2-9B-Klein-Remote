@@ -25,6 +25,7 @@
   let currentResult = $state(null);
   let wsError = $state('');
   let codeUsesRemaining = $state(null); // null = not a code user or unlimited; 0 = depleted
+  let userUsesRemaining = $state(null); // null = unlimited; number = remaining uses for Google user
   let showModal = $state(false);
   let showAdmin = $state(false);
   let showGallery = $state(false);
@@ -49,6 +50,11 @@
     token = newToken;
     user = newUser;
     view = 'submit';
+
+    // Initialise quota for Google users from login response
+    if (!newUser.type || newUser.type !== 'code_user') {
+      userUsesRemaining = newUser.usesRemaining ?? null;
+    }
 
     ws = createPhoneWS(token);
 
@@ -94,6 +100,13 @@
     ws.on('code_status', ({ usesRemaining }) => {
       codeUsesRemaining = usesRemaining; // null = unlimited
       // If admin restored uses, also dismiss any stale error banner
+      if (usesRemaining === null || usesRemaining > 0) {
+        if (wsError) wsError = '';
+      }
+    });
+
+    ws.on('uses_updated', ({ usesRemaining }) => {
+      userUsesRemaining = usesRemaining; // null = unlimited
       if (usesRemaining === null || usesRemaining > 0) {
         if (wsError) wsError = '';
       }
@@ -233,6 +246,7 @@
       showVaultSettingsBtn={isGoogleUser && vaultInfo?.configured}
       onOpenVaultSettings={handleOpenVaultSettings}
       {codeUsesRemaining}
+      {userUsesRemaining}
     />
   {/if}
 

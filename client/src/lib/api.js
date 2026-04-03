@@ -233,3 +233,16 @@ export async function updateUserStatus(token, id, status) {
   }
   return res.json();
 }
+
+export async function updateUserUses(token, id, usesRemaining) {
+  const res = await fetch(`/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usesRemaining }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update user uses: ${res.status}`);
+  }
+  return res.json();
+}

@@ -16,17 +16,18 @@ db.pragma('foreign_keys = ON');
 // ── Schema ────────────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    google_sub  TEXT    UNIQUE NOT NULL,
-    email       TEXT    NOT NULL,
-    name        TEXT    NOT NULL DEFAULT '',
-    picture     TEXT    NOT NULL DEFAULT '',
-    status      TEXT    NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending', 'active', 'suspended')),
-    is_admin    INTEGER NOT NULL DEFAULT 0
-                        CHECK (is_admin IN (0, 1)),
-    created_at  INTEGER NOT NULL,
-    updated_at  INTEGER NOT NULL
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    google_sub      TEXT    UNIQUE NOT NULL,
+    email           TEXT    NOT NULL,
+    name            TEXT    NOT NULL DEFAULT '',
+    picture         TEXT    NOT NULL DEFAULT '',
+    status          TEXT    NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'active', 'suspended')),
+    is_admin        INTEGER NOT NULL DEFAULT 0
+                            CHECK (is_admin IN (0, 1)),
+    uses_remaining  INTEGER DEFAULT 0,
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS invite_codes (
@@ -69,6 +70,17 @@ db.exec(`
     ON stored_results(user_id, created_at DESC);
 `);
 
+// ── Runtime migrations ───────────────────────────────────────────────────────
+// Uses PRAGMA user_version to track applied migrations.
+const _dbVersion = db.pragma('user_version', { simple: true });
+
+if (_dbVersion < 1) {
+  // v1: add uses_remaining to users; pre-existing users become unlimited (NULL)
+  try { db.exec('ALTER TABLE users ADD COLUMN uses_remaining INTEGER DEFAULT 0'); } catch { /* already exists on fresh DB */ }
+  db.exec('UPDATE users SET uses_remaining = NULL WHERE uses_remaining = 0');
+  db.pragma('user_version = 1');
+}
+
 // ── Prepared statements ───────────────────────────────────────────────────────
 
 // Users
@@ -89,6 +101,10 @@ const stmtUpdateUserStatus = db.prepare(
 
 const stmtSetAdmin = db.prepare(
   'UPDATE users SET is_admin = @is_admin, updated_at = @updated_at WHERE id = @id',
+);
+
+const stmtUpdateUserUses = db.prepare(
+  'UPDATE users SET uses_remaining = @uses_remaining, updated_at = @updated_at WHERE id = @id',
 );
 
 const stmtFindByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
@@ -174,11 +190,11 @@ const stmtDeleteVault = db.prepare(
 );
 
 const stmtGetAllUsers = db.prepare(
-  'SELECT id, email, name, picture, status, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC',
+  'SELECT id, email, name, picture, status, is_admin, uses_remaining, created_at, updated_at FROM users ORDER BY created_at DESC',
 );
 
 const stmtGetUsersByStatus = db.prepare(
-  'SELECT id, email, name, picture, status, is_admin, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
+  'SELECT id, email, name, picture, status, is_admin, uses_remaining, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
 );
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -216,6 +232,10 @@ export function updateUserStatus(id, status) {
 
 export function setUserAdmin(id, isAdmin) {
   return stmtSetAdmin.run({ id, is_admin: isAdmin ? 1 : 0, updated_at: Date.now() });
+}
+
+export function updateUserUses(id, usesRemaining) {
+  return stmtUpdateUserUses.run({ id, uses_remaining: usesRemaining ?? null, updated_at: Date.now() });
 }
 
 // Invite codes
