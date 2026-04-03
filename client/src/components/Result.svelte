@@ -113,7 +113,7 @@
       <div class="actions">
         <a href={imageUrl} download="result.png" class="btn btn-accent">Download</a>
         {#if userType === 'google'}
-          <button onclick={handleSave} class="btn btn-ghost" class:save-pending={savePending} disabled={saving || saved || savePending}>
+          <button onclick={handleSave} class="btn btn-ghost" class:save-pending={savePending} disabled={saving || saved}>
             {#if saved}✓ Saved
             {:else if saving}Saving…
             {:else if savePending}Unlock vault to save
