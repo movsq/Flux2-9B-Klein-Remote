@@ -65,7 +65,7 @@
     });
 
     ws.on('result', (msg) => {
-      if (currentJobId && msg.jobId !== currentJobId) {
+      if (!currentJobId || msg.jobId !== currentJobId) {
         console.log(`[app] Ignoring stale result for job ${msg.jobId}`);
         return;
       }      if (!currentAesKey) {
@@ -208,6 +208,11 @@
     currentAesKey = aesKey;
   }
 
+  function handleJobCancelled() {
+    currentJobId = null;
+    currentAesKey = null;
+  }
+
   // ── Modal close (keeps result for Preview button) ──────────────────────────
   function handleClose() {
     showModal = false;
@@ -240,6 +245,7 @@
     <Submit
       {token} {ws}
       onJobSubmitted={handleJobSubmitted}
+      onCancel={handleJobCancelled}
       bind:seed bind:seedMode
       previewResult={currentResult}
       onPreview={() => showModal = true}

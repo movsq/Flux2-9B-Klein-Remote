@@ -9,7 +9,7 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null, userUsesRemaining = null } = $props();
+  let { token, ws, onJobSubmitted, onCancel = () => {}, seed = $bindable(), seedMode = $bindable(), previewResult, onPreview, onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null, userUsesRemaining = null } = $props();
 
   let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
   let userDepleted = $derived(userUsesRemaining !== null && userUsesRemaining === 0);
@@ -349,6 +349,7 @@
   function handleCancel() {
     ws.send({ type: 'cancel', jobId: currentJobId });
     reset();
+    onCancel();
   }
 
   function reset() {
