@@ -11,25 +11,7 @@ results are visible to it.
 
 ---
 
-## Screenshots
-
-<table>
-  <tr>
-    <td align="center"><b>Login</b><br><img src="docs/screenshots/login.png" width="220"></td>
-    <td align="center"><b>Generate</b><br><img src="docs/screenshots/submit.png" width="220"></td>
-    <td align="center"><b>Gallery</b><br><img src="docs/screenshots/gallery.png" width="220"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Admin — Codes</b><br><img src="docs/screenshots/admin-codes.png" width="220"></td>
-    <td align="center"><b>Admin — Users</b><br><img src="docs/screenshots/admin-users.png" width="220"></td>
-    <td align="center"><b>Vault Settings</b><br><img src="docs/screenshots/vault-settings.png" width="220"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Unlock Vault</b><br><img src="docs/screenshots/unlock-vault.png" width="220"></td>
-    <td></td>
-    <td></td>
-  </tr>
-</table>
+<p align="center"><a href="#screenshots"><strong>📷 Go to Screenshots</strong></a></p>
 
 ---
 
@@ -497,6 +479,28 @@ All messages are JSON. The `payload` field is a base64 binary blob the server ne
 | `GET` | `/results` | active | List results with thumbnails (paginated) |
 | `GET` | `/results/:id` | active | Get full encrypted result |
 | `DELETE` | `/results/:id` | active | Delete a stored result |
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><b>Login</b><br><img src="docs/screenshots/login.png" width="220"></td>
+    <td align="center"><b>Generate</b><br><img src="docs/screenshots/submit.png" width="220"></td>
+    <td align="center"><b>Gallery</b><br><img src="docs/screenshots/gallery.png" width="220"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Admin — Codes</b><br><img src="docs/screenshots/admin-codes.png" width="220"></td>
+    <td align="center"><b>Admin — Users</b><br><img src="docs/screenshots/admin-users.png" width="220"></td>
+    <td align="center"><b>Vault Settings</b><br><img src="docs/screenshots/vault-settings.png" width="220"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Unlock Vault</b><br><img src="docs/screenshots/unlock-vault.png" width="220"></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
 ---
 
