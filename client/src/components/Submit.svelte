@@ -738,13 +738,13 @@
 
       <!-- Generate row -->
       <div class="generate-row">
-        <button type="submit" class="btn-generate" disabled={!prompt.trim() || status === 'encrypting' || codeDepleted || userDepleted || queueFull}>
+        <button type="submit" class="btn-generate" class:btn-queue-full={queueFull} disabled={!prompt.trim() || status === 'encrypting' || codeDepleted || userDepleted || queueFull}>
           {#if status === 'encrypting'}
             ENCRYPTING...
           {:else if queueFull}
-            QUEUE FULL ({myQueueCount}/3)
+            QUEUED JOBS ({myQueueCount}/3)
           {:else}
-            ADD TO QUEUE
+            ADD TO QUEUE ({myQueueCount}/3)
           {/if}
         </button>
       </div>
@@ -840,7 +840,7 @@
   }
 
   .card.card-drag {
-    border-color: rgba(123, 156, 191, 0.35);
+    border-color: rgba(82, 116, 144, 0.35);
   }
 
   /* ── Form ──────────────────────────────────────────────────────────── */
@@ -906,14 +906,14 @@
     flex-shrink: 0;
   }
 
-  .btn-admin:hover { background-color: rgba(9, 9, 11, 0.5); color: #7b9cbf; }
+  .btn-admin:hover { background-color: rgba(9, 9, 11, 0.5); color: #527490; }
   .btn-admin:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .form-title {
     font-family: 'Syne', sans-serif;
     font-size: 1.6rem;
     font-weight: 800;
-    color: #f4f4f5;
+    color: #d4d4d8;
     letter-spacing: -0.02em;
     line-height: 1;
   }
@@ -922,7 +922,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
     letter-spacing: 0.2em;
-    color: #7b9cbf;
+    color: #527490;
   }
 
   /* ── Field label ───────────────────────────────────────────────────── */
@@ -982,9 +982,9 @@
   }
 
   .img-label:hover .drop-zone {
-    border-color: rgba(123, 156, 191, 0.4);
-    color: #7b9cbf;
-    background-color: rgba(123, 156, 191, 0.06);
+    border-color: rgba(82, 116, 144, 0.4);
+    color: #527490;
+    background-color: rgba(82, 116, 144, 0.06);
   }
 
   .img-preview-wrap {
@@ -1012,7 +1012,7 @@
     align-items: center;
     justify-content: center;
     background: rgba(9, 9, 11, 0.65);
-    color: #7b9cbf;
+    color: #527490;
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     letter-spacing: 0.18em;
@@ -1030,15 +1030,15 @@
   }
 
   .drag-target .drop-zone {
-    border-color: rgba(123, 156, 191, 0.6);
-    color: #7b9cbf;
-    background: rgba(123, 156, 191, 0.06);
-    box-shadow: 0 0 0 3px rgba(123, 156, 191, 0.12);
+    border-color: rgba(82, 116, 144, 0.6);
+    color: #527490;
+    background: rgba(82, 116, 144, 0.06);
+    box-shadow: 0 0 0 3px rgba(82, 116, 144, 0.12);
   }
 
   .drag-target .img-preview {
-    border-color: rgba(123, 156, 191, 0.5);
-    box-shadow: 0 0 0 3px rgba(123, 156, 191, 0.12);
+    border-color: rgba(82, 116, 144, 0.5);
+    box-shadow: 0 0 0 3px rgba(82, 116, 144, 0.12);
   }
 
   .hidden-input { display: none; }
@@ -1066,7 +1066,7 @@
     transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.12s ease;
   }
 
-  .btn-swap:hover { color: #7b9cbf; border-color: rgba(123, 156, 191, 0.35); background: rgba(123, 156, 191, 0.05); }
+  .btn-swap:hover { color: #527490; border-color: rgba(82, 116, 144, 0.35); background: rgba(82, 116, 144, 0.05); }
   .btn-swap:active { transform: scale(0.93); }
 
   .btn-clear {
@@ -1133,7 +1133,7 @@
   input::placeholder { color: #6c7585; }
 
   textarea:focus,
-  input[type='number']:focus { border-color: rgba(123, 156, 191, 0.4); }
+  input[type='number']:focus { border-color: rgba(82, 116, 144, 0.4); }
 
   textarea:disabled,
   input:disabled { opacity: 0.45; }
@@ -1229,7 +1229,7 @@
 
   .select-option:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
   .select-option:active { transform: scale(0.98); }
-  .select-option.active { color: #7b9cbf; }
+  .select-option.active { color: #527490; }
 
   /* ── Range slider ────────────────────────────────────────────────────── */
   .param-field-slider {
@@ -1270,17 +1270,17 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #7b9cbf;
+    background: #527490;
     border: 2px solid rgba(9, 9, 11, 0.8);
     cursor: pointer;
     transition: background 0.2s, transform 0.12s;
   }
-  .range-slider::-webkit-slider-thumb:hover { background: #a3bdd4; transform: scale(1.15); }
+  .range-slider::-webkit-slider-thumb:hover { background: #7d9db6; transform: scale(1.15); }
   .range-slider::-moz-range-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #7b9cbf;
+    background: #527490;
     border: 2px solid rgba(9, 9, 11, 0.8);
     cursor: pointer;
   }
@@ -1306,7 +1306,7 @@
     padding: 0.85rem;
     border: none;
     border-radius: 3rem;
-    background: #7b9cbf;
+    background: #527490;
     color: #09090b;
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -1316,9 +1316,10 @@
     transition: transform 0.12s ease, filter 0.12s ease, background 0.3s, flex 0.3s ease;
   }
 
-  .btn-generate:hover:not(:disabled) { background: #a3bdd4; }
+  .btn-generate:hover:not(:disabled) { background: #7d9db6; }
   .btn-generate:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-generate:disabled { opacity: 0.7; cursor: not-allowed; }
+  .btn-generate.btn-queue-full:disabled { opacity: 0.42; }
 
   /* ── Error / Code status ─────────────────────────────────────────────── */
   .error {
@@ -1379,7 +1380,7 @@
     flex-shrink: 0;
     transition: color 0.2s;
   }
-  .config-row:hover .config-icon { color: #7b9cbf; }
+  .config-row:hover .config-icon { color: #527490; }
 
   .config-label {
     font-family: 'DM Mono', monospace;
@@ -1507,7 +1508,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.22em;
-    color: #7b9cbf;
+    color: #527490;
   }
 
   .cfg-close {
@@ -1564,7 +1565,7 @@
     padding: 0.85rem;
     border: none;
     border-radius: 3rem;
-    background: #7b9cbf;
+    background: #527490;
     color: #09090b;
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -1573,7 +1574,7 @@
     cursor: pointer;
     transition: transform 0.12s ease, filter 0.12s ease, background 0.2s;
   }
-  .cfg-done:hover { background: #a3bdd4; }
+  .cfg-done:hover { background: #7d9db6; }
   .cfg-done:active { transform: scale(0.97); filter: brightness(0.85); }
 
   /* ── Mobile layout ───────────────────────────────────────────────────── */
@@ -1681,7 +1682,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.1em;
-    color: #7b9cbf;
+    color: #527490;
     font-weight: 500;
     transition: color 0.2s;
   }
@@ -1721,13 +1722,13 @@
   }
 
   .queue-item.queue-mine {
-    background: rgba(123, 156, 191, 0.08);
-    border-left: 2px solid rgba(123, 156, 191, 0.5);
+    background: rgba(82, 116, 144, 0.08);
+    border-left: 2px solid rgba(82, 116, 144, 0.5);
     padding-left: calc(0.875rem - 2px);
   }
 
   .queue-item.queue-active.queue-mine {
-    background: rgba(123, 156, 191, 0.13);
+    background: rgba(82, 116, 144, 0.13);
   }
 
   .queue-item.queue-theirs {
@@ -1738,9 +1739,9 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.55rem;
     letter-spacing: 0.15em;
-    color: #7b9cbf;
-    background: rgba(123, 156, 191, 0.15);
-    border: 1px solid rgba(123, 156, 191, 0.35);
+    color: #527490;
+    background: rgba(82, 116, 144, 0.15);
+    border: 1px solid rgba(82, 116, 144, 0.35);
     border-radius: 0.25rem;
     padding: 0.08rem 0.3rem;
     flex-shrink: 0;
@@ -1785,7 +1786,7 @@
   }
 
   .queue-dot.processing {
-    background: #7b9cbf;
+    background: #527490;
     animation: queue-pulse 1.5s ease-in-out infinite;
   }
 
@@ -1801,11 +1802,11 @@
   .queue-progress-inline {
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
-    color: #7b9cbf;
+    color: #527490;
     letter-spacing: 0.06em;
     background: linear-gradient(
       to right,
-      rgba(123, 156, 191, 0.2) var(--progress, 0%),
+      rgba(82, 116, 144, 0.2) var(--progress, 0%),
       transparent var(--progress, 0%)
     );
     padding: 0.1rem 0.4rem;
@@ -1823,7 +1824,7 @@
     height: 28px;
     object-fit: cover;
     border-radius: 0.25rem;
-    border: 1px solid rgba(123, 156, 191, 0.22);
+    border: 1px solid rgba(82, 116, 144, 0.22);
     flex-shrink: 0;
     pointer-events: none;
     user-select: none;
@@ -1875,7 +1876,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
     letter-spacing: 0.04em;
-    color: #7b9cbf;
+    color: #527490;
     opacity: 0.75;
     animation: queue-marquee 14s linear infinite;
   }

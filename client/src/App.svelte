@@ -21,12 +21,15 @@
   let user = $state(null);       // { name, email, status, isAdmin, type }
   let ws = $state(null);
   let view = $state('login');        // 'login' | 'submit'
-  let currentResult = $state(null);
-  let currentResultAesKey = $state(null); // AES key for the result currently being viewed
+  // Result stack — index 0 is frontmost (currently shown), others peek behind it
+  let resultStack = $state([]); // [{ id, result, aesKey, promptSnippet, imageUrl }]
+  // Dismissed results waiting 2 min before auto-expiring
+  let dismissedResults = $state([]); // [{ id, result, aesKey, promptSnippet, imageUrl, expiresAt, timerId }]
+  // Ticker for countdown displays
+  let clockNow = $state(Date.now());
   let wsError = $state('');
   let codeUsesRemaining = $state(null); // null = not a code user or unlimited; 0 = depleted
   let userUsesRemaining = $state(null); // null = unlimited; number = remaining uses for Google user
-  let showModal = $state(false);
   let showAdmin = $state(false);
   let showGallery = $state(false);
   let showTerms = $state(false);
@@ -54,6 +57,12 @@
 
   // Derived
   let isGoogleUser = $derived(user?.type === 'google' || (user && !user.type));
+
+  // Tick clockNow every second for dismissed-card countdown
+  $effect(() => {
+    const id = setInterval(() => { clockNow = Date.now(); }, 1000);
+    return () => clearInterval(id);
+  });
 
   // ── Login ──────────────────────────────────────────────────────────────────
   function handleLogin(newToken, newUser) {
@@ -84,10 +93,15 @@
         console.log(`[app] Ignoring stale result for job ${msg.jobId}`);
         return;
       }
-      wsError = ''; // result arrived — any “PC not connected” banner is stale
-      currentResult = msg;
-      currentResultAesKey = entry.aesKey;
-      showModal = true;
+      wsError = '';
+      // Append to END of stack (opens behind the currently-viewed result)
+      resultStack = [...resultStack, {
+        id: msg.jobId,
+        result: msg,
+        aesKey: entry.aesKey,
+        promptSnippet: (entry.promptText ?? '').slice(0, 80),
+        imageUrl: null,
+      }];
       // Remove from pending
       pendingJobs.delete(msg.jobId);
       pendingJobs = new Map(pendingJobs); // trigger reactivity
@@ -152,12 +166,13 @@
       ws = null;
       token = null;
       user = null;
-      currentResult = null;
-      currentResultAesKey = null;
+      // Cancel all dismissed timers
+      dismissedResults.forEach(d => clearTimeout(d.timerId));
+      resultStack = [];
+      dismissedResults = [];
       pendingJobs = new Map();
       queueState = { queue: [], activeJobId: null, avgDuration: 60 };
       wsError = '';
-      showModal = false;
       showAdmin = false;
       showGallery = false;
       showTerms = false;
@@ -256,21 +271,42 @@
     }
   }
 
-  // ── Modal close (keeps result for Preview button) ──────────────────────────
+  // ── Modal close: dismiss front result to 2-min recovery shelf ────────────────────
   function handleClose() {
-    showModal = false;
+    if (resultStack.length === 0) return;
+    const item = resultStack[0];
+    resultStack = resultStack.slice(1);
+    // Move to dismissed with 2-min auto-expire
+    const expiresAt = Date.now() + 120_000;
+    const timerId = setTimeout(() => {
+      dismissedResults = dismissedResults.filter(d => d.id !== item.id);
+    }, 120_000);
+    dismissedResults = [...dismissedResults, { ...item, expiresAt, timerId }];
   }
 
-  // ── New Job (clears result entirely) ──────────────────────────────────────
+  // ── New Job: discard front result cleanly, advance seed ──────────────────────
   function handleDone() {
     if (seedMode === 'randomize') seed = randomSeed();
     else if (seedMode === 'increment') seed = seed + 1;
     else if (seedMode === 'decrement') seed = seed - 1;
-
-    currentResult = null;
-    currentResultAesKey = null;
+    resultStack = resultStack.slice(1);
     wsError = '';
-    showModal = false;
+  }
+
+  // Store decrypted imageUrl so dismissed cards can display the image
+  function storeImageUrl(id, url) {
+    resultStack = resultStack.map(item => item.id === id ? { ...item, imageUrl: url } : item);
+    dismissedResults = dismissedResults.map(item => item.id === id ? { ...item, imageUrl: url } : item);
+  }
+
+  // Re-open a dismissed result: cancel its expiry and bring it to the front
+  function reopenDismissed(id) {
+    const item = dismissedResults.find(d => d.id === id);
+    if (!item) return;
+    clearTimeout(item.timerId);
+    dismissedResults = dismissedResults.filter(d => d.id !== id);
+    const { expiresAt, timerId, ...entry } = item;
+    resultStack = [entry, ...resultStack];
   }
 
   onDestroy(() => ws?.close());
@@ -303,17 +339,47 @@
     />
   {/if}
 
-  {#if showModal && currentResult}
-    <Result
-      result={currentResult}
-      aesKey={currentResultAesKey}
-      onDone={handleDone}
-      onClose={handleClose}
-      {token}
-      {masterKey}
-      userType={user?.type ?? 'google'}
-      onRequestVaultUnlock={requestVaultUnlock}
-    />
+  {#if resultStack.length > 0}
+    <!-- Render back-to-front: last in array = deepest, index 0 = topmost.
+         We iterate reversed so index 0 is rendered last (highest DOM stacking order). -->
+    {#each [...resultStack].reverse() as item, revI (item.id)}
+      {@const forwardI = resultStack.length - 1 - revI}
+      <Result
+        result={item.result}
+        aesKey={item.aesKey}
+        onDone={handleDone}
+        onClose={handleClose}
+        onImageReady={(url) => storeImageUrl(item.id, url)}
+        isGhost={forwardI > 0}
+        stackOffset={forwardI}
+        {token}
+        {masterKey}
+        userType={user?.type ?? 'google'}
+        onRequestVaultUnlock={requestVaultUnlock}
+      />
+    {/each}
+  {/if}
+
+  <!-- Dismissed results: image thumbnail + countdown, click to reopen -->
+  {#if dismissedResults.length > 0}
+    <div class="dismissed-shelf">
+      {#each dismissedResults as dismissed (dismissed.id)}
+        {@const secondsLeft = Math.max(0, Math.ceil((dismissed.expiresAt - clockNow) / 1000))}
+        {@const mm = String(Math.floor(secondsLeft / 60))}
+        {@const ss = String(secondsLeft % 60).padStart(2, '0')}
+        <button class="dismissed-card" onclick={() => reopenDismissed(dismissed.id)} type="button" title="Click to reopen result">
+          {#if dismissed.imageUrl}
+            <img src={dismissed.imageUrl} alt="Dismissed result" class="dismissed-thumb" />
+          {:else}
+            <div class="dismissed-thumb-placeholder">…</div>
+          {/if}
+          <div class="dismissed-meta">
+            <span class="dismissed-prompt">{dismissed.promptSnippet || 'Result'}</span>
+            <span class="dismissed-timer">{mm}:{ss}</span>
+          </div>
+        </button>
+      {/each}
+    </div>
   {/if}
 
   {#if showAdmin && user?.isAdmin}
@@ -405,6 +471,97 @@
     letter-spacing: 0.06em;
     padding: 0.5rem 1rem;
     text-align: center;
+  }
+
+  /* Dismissed results shelf ───────────────────────────────────────── */
+  .dismissed-shelf {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1rem;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+    pointer-events: none;
+  }
+
+  .dismissed-card {
+    pointer-events: all;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: rgba(15, 18, 23, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    padding: 0.4rem 0.65rem 0.4rem 0.4rem;
+    cursor: pointer;
+    backdrop-filter: blur(16px);
+    max-width: 260px;
+    transition: border-color 0.15s, transform 0.15s;
+    animation: dismissed-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+
+  .dismissed-card:hover {
+    border-color: rgba(82, 116, 144, 0.4);
+    transform: translateY(-2px);
+  }
+
+  @keyframes dismissed-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .dismissed-thumb {
+    width: 2.75rem;
+    height: 2.75rem;
+    object-fit: cover;
+    border-radius: 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+    display: block;
+  }
+
+  .dismissed-thumb-placeholder {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #525a66;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .dismissed-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .dismissed-prompt {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: #a4afbb;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 170px;
+  }
+
+  .dismissed-timer {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: #c4996a;
+    letter-spacing: 0.08em;
   }
 
 

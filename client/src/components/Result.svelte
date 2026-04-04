@@ -3,7 +3,7 @@
   import { encryptBlob, generateThumbnail, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
 
-  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null } = $props();
+  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null } = $props();
 
   let imageUrl = $state(null);
   let imageBytes = $state(null); // raw PNG bytes, kept alongside imageUrl for save
@@ -16,6 +16,7 @@
 
   const DECRYPT_TIMEOUT_MS = 15_000;
   let _decryptInFlight = false; // re-entry guard
+  let _decryptStarted = false;  // one-shot: effect may only initiate decrypt once
 
   // Auto-trigger save once masterKey arrives after a pending save request
   $effect(() => {
@@ -26,7 +27,8 @@
   });
 
   $effect(() => {
-    if (!result || !aesKey) return;
+    if (!result || !aesKey || _decryptStarted) return;
+    _decryptStarted = true;
     decrypt();
   });
 
@@ -47,6 +49,8 @@
       imageBytes = plaintext;
       const blob = new Blob([plaintext], { type: 'image/png' });
       imageUrl = URL.createObjectURL(blob);
+      // Notify parent so dismissed cards can show the image
+      if (onImageReady) onImageReady(imageUrl);
     } catch (err) {
       decryptError = `Decryption failed: ${err.message}`;
     } finally {
@@ -98,7 +102,15 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
-<div class="backdrop" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+<div
+  class="backdrop"
+  class:ghost={isGhost}
+  style={isGhost ? `--stack-offset: ${stackOffset}` : ''}
+  role="dialog"
+  aria-modal="true"
+  tabindex="-1"
+  onclick={(e) => { if (!isGhost && e.target === e.currentTarget) onClose(); }}
+>
   <div class="modal">
     <button class="close-btn" onclick={onClose} aria-label="Close">✕</button>
 
@@ -143,6 +155,30 @@
     justify-content: center;
     padding: 0.75rem 0.75rem 1.25rem;
     animation: fade-in 0.18s ease;
+  }
+
+  /* Ghost ("behind" stack entry): no dimming, no pointer events, peeking visual */
+  .backdrop.ghost {
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+    z-index: calc(98 - var(--stack-offset, 1) * 2);
+    animation: none;
+  }
+
+  .backdrop.ghost .modal {
+    transform:
+      translateY(calc(var(--stack-offset, 1) * -10px))
+      scale(calc(1 - var(--stack-offset, 1) * 0.028));
+    opacity: calc(1 - var(--stack-offset, 1) * 0.18);
+    filter: blur(calc(var(--stack-offset, 1) * 0.6px));
+    animation: none;
+  }
+
+  .backdrop.ghost .close-btn,
+  .backdrop.ghost .actions,
+  .backdrop.ghost .modal-label {
+    opacity: 0;
   }
 
   @media (min-width: 480px) {
@@ -222,13 +258,13 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.2em;
-    color: #7b9cbf;
+    color: #527490;
     font-weight: 400;
   }
 
   .status {
     font-family: 'DM Mono', monospace;
-    color: #7b9cbf;
+    color: #527490;
     font-size: 0.8rem;
     margin: 0;
     letter-spacing: 0.08em;
@@ -280,12 +316,12 @@
   }
 
   .btn-accent {
-    background: #7b9cbf;
+    background: #527490;
     color: #09090b;
   }
 
   .btn-accent:hover {
-    background: #a3bdd4;
+    background: #7d9db6;
   }
 
   .btn-ghost {
@@ -300,8 +336,8 @@
   }
 
   .btn-ghost.save-pending {
-    border-color: rgba(123, 156, 191, 0.3);
-    color: #7b9cbf;
+    border-color: rgba(82, 116, 144, 0.3);
+    color: #527490;
     opacity: 0.75;
   }
 

@@ -187,8 +187,8 @@ The queue panel appears below the submit form and shows all queued jobs in real 
 - **Estimated wait time** — calculated from a rolling average of the last 10 job durations
 - **Cancel button** — users can cancel their own pending or processing jobs
 
-The submit button changes to "ADD TO QUEUE" and shows the user's current queue count.
-When the per-user limit is reached the button becomes disabled ("QUEUE FULL 3/3").
+The submit button always shows the current slot count: **ADD TO QUEUE (x/3)**.
+When the per-user limit is reached the button becomes disabled: **QUEUED JOBS (3/3)**.
 
 ### `queue_update` message shape
 
