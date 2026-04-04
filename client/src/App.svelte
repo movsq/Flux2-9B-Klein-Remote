@@ -21,9 +21,8 @@
   let user = $state(null);       // { name, email, status, isAdmin, type }
   let ws = $state(null);
   let view = $state('login');        // 'login' | 'submit'
-  let currentAesKey = $state(null);
-  let currentJobId = $state(null);
   let currentResult = $state(null);
+  let currentResultAesKey = $state(null); // AES key for the result currently being viewed
   let wsError = $state('');
   let codeUsesRemaining = $state(null); // null = not a code user or unlimited; 0 = depleted
   let userUsesRemaining = $state(null); // null = unlimited; number = remaining uses for Google user
@@ -32,6 +31,11 @@
   let showGallery = $state(false);
   let showTerms = $state(false);
   let tosAccepted = $state(false);
+
+  // Queue state
+  let queueState = $state({ queue: [], activeJobId: null, avgDuration: 60 });
+  /** Map<jobId, { aesKey: CryptoKey, promptSnippet: string }> */
+  let pendingJobs = $state(new Map());
 
   // Vault state
   let vaultInfo = $state(null);       // null | { configured, hasBio, hasPw, ... }
@@ -70,31 +74,40 @@
       ws = createPhoneWS(token);
 
     ws.on('queued', ({ jobId }) => {
-      currentJobId = jobId;
       wsError = ''; // server accepted the job — dismiss any stale error banner
       console.log(`[app] Job queued: ${jobId}`);
     });
 
     ws.on('result', (msg) => {
-      if (!currentJobId || msg.jobId !== currentJobId) {
+      const entry = pendingJobs.get(msg.jobId);
+      if (!entry) {
         console.log(`[app] Ignoring stale result for job ${msg.jobId}`);
         return;
-      }      if (!currentAesKey) {
-        console.log(`[app] Ignoring result — no AES key available (job ${msg.jobId})`);
-        return;
-      }      wsError = ''; // result arrived — any “PC not connected” banner is stale
+      }
+      wsError = ''; // result arrived — any “PC not connected” banner is stale
       currentResult = msg;
+      currentResultAesKey = entry.aesKey;
       showModal = true;
+      // Remove from pending
+      pendingJobs.delete(msg.jobId);
+      pendingJobs = new Map(pendingJobs); // trigger reactivity
     });
 
-    ws.on('error', ({ message }) => {
+    ws.on('error', ({ message, jobId }) => {
       // Map internal error keys to user-friendly messages
       if (message === 'no_uses_remaining') {
         wsError = 'No uses remaining — contact an admin to get more.';
       } else if (message === 'tos_not_accepted') {
         showTerms = true;
+      } else if (message === 'queue_full') {
+        wsError = 'Queue is full (max 3 jobs) — wait for one to finish.';
       } else {
         wsError = message ?? 'Unknown error';
+      }
+      // Remove from pending if we have a jobId for it
+      if (jobId && pendingJobs.has(jobId)) {
+        pendingJobs.delete(jobId);
+        pendingJobs = new Map(pendingJobs);
       }
     });
 
@@ -108,6 +121,10 @@
 
     ws.on('open', () => {
       wsError = '';
+    });
+
+    ws.on('queue_update', (msg) => {
+      queueState = { queue: msg.queue, activeJobId: msg.activeJobId, avgDuration: msg.avgDuration };
     });
 
     ws.on('code_refreshed', () => {
@@ -135,9 +152,10 @@
       ws = null;
       token = null;
       user = null;
-      currentAesKey = null;
-      currentJobId = null;
       currentResult = null;
+      currentResultAesKey = null;
+      pendingJobs = new Map();
+      queueState = { queue: [], activeJobId: null, avgDuration: 60 };
       wsError = '';
       showModal = false;
       showAdmin = false;
@@ -226,13 +244,16 @@
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  function handleJobSubmitted({ aesKey }) {
-    currentAesKey = aesKey;
+  function handleJobSubmitted({ aesKey, jobId, promptText, preview1, preview2 }) {
+    pendingJobs.set(jobId, { aesKey, promptText, preview1, preview2 });
+    pendingJobs = new Map(pendingJobs); // trigger reactivity
   }
 
-  function handleJobCancelled() {
-    currentJobId = null;
-    currentAesKey = null;
+  function handleJobCancelled({ jobId }) {
+    if (jobId && pendingJobs.has(jobId)) {
+      pendingJobs.delete(jobId);
+      pendingJobs = new Map(pendingJobs);
+    }
   }
 
   // ── Modal close (keeps result for Preview button) ──────────────────────────
@@ -247,8 +268,7 @@
     else if (seedMode === 'decrement') seed = seed - 1;
 
     currentResult = null;
-    currentAesKey = null;
-    currentJobId = null;
+    currentResultAesKey = null;
     wsError = '';
     showModal = false;
   }
@@ -269,8 +289,6 @@
       onJobSubmitted={handleJobSubmitted}
       onCancel={handleJobCancelled}
       bind:seed bind:seedMode
-      previewResult={currentResult}
-      onPreview={() => showModal = true}
       onNewJob={handleDone}
       isAdmin={user?.isAdmin}
       onOpenAdmin={() => showAdmin = true}
@@ -280,13 +298,15 @@
       onOpenVaultSettings={handleOpenVaultSettings}
       {codeUsesRemaining}
       {userUsesRemaining}
+      {queueState}
+      {pendingJobs}
     />
   {/if}
 
   {#if showModal && currentResult}
     <Result
       result={currentResult}
-      aesKey={currentAesKey}
+      aesKey={currentResultAesKey}
       onDone={handleDone}
       onClose={handleClose}
       {token}
