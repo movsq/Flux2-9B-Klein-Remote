@@ -81,6 +81,12 @@ if (_dbVersion < 1) {
   db.pragma('user_version = 1');
 }
 
+if (db.pragma('user_version', { simple: true }) < 2) {
+  // v2: add tos_accepted_at to users — NULL means not yet accepted
+  try { db.exec('ALTER TABLE users ADD COLUMN tos_accepted_at INTEGER DEFAULT NULL'); } catch { /* already exists on fresh DB */ }
+  db.pragma('user_version = 2');
+}
+
 // ── Prepared statements ───────────────────────────────────────────────────────
 
 // Users
@@ -114,6 +120,10 @@ const stmtAtomicDecrementUserUses = db.prepare(
 
 const stmtFindByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
 
+const stmtUpdateTosAccepted = db.prepare(
+  'UPDATE users SET tos_accepted_at = @tos_accepted_at, updated_at = @updated_at WHERE id = @id',
+);
+
 // Invite codes
 const stmtCreateCode = db.prepare(`
   INSERT INTO invite_codes (code, type, created_by, uses_remaining, expires_at, created_at)
@@ -125,6 +135,11 @@ const stmtFindCodeById = db.prepare('SELECT * FROM invite_codes WHERE id = ?');
 
 const stmtDecrementCodeUses = db.prepare(
   'UPDATE invite_codes SET uses_remaining = uses_remaining - 1 WHERE id = ?',
+);
+
+// Atomic decrement: only succeeds if uses_remaining > 0. Returns result.changes = 1 on success.
+const stmtAtomicDecrementCodeUses = db.prepare(
+  'UPDATE invite_codes SET uses_remaining = uses_remaining - 1 WHERE id = ? AND uses_remaining > 0',
 );
 
 const stmtGetCodesByCreator = db.prepare(
@@ -195,11 +210,11 @@ const stmtDeleteVault = db.prepare(
 );
 
 const stmtGetAllUsers = db.prepare(
-  'SELECT id, email, name, picture, status, is_admin, uses_remaining, created_at, updated_at FROM users ORDER BY created_at DESC',
+  'SELECT id, email, name, picture, status, is_admin, uses_remaining, tos_accepted_at, created_at, updated_at FROM users ORDER BY created_at DESC',
 );
 
 const stmtGetUsersByStatus = db.prepare(
-  'SELECT id, email, name, picture, status, is_admin, uses_remaining, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
+  'SELECT id, email, name, picture, status, is_admin, uses_remaining, tos_accepted_at, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
 );
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -251,6 +266,10 @@ export function atomicDecrementUserUses(id) {
   return stmtAtomicDecrementUserUses.run({ id, updated_at: Date.now() });
 }
 
+export function updateTosAccepted(id) {
+  return stmtUpdateTosAccepted.run({ id, tos_accepted_at: Date.now(), updated_at: Date.now() });
+}
+
 // Invite codes
 
 export function createInviteCode({ code, type = 'registration', createdBy, usesRemaining = null, expiresAt = null }) {
@@ -274,6 +293,14 @@ export function findInviteCodeById(id) {
 
 export function decrementCodeUses(id) {
   return stmtDecrementCodeUses.run(id);
+}
+
+/**
+ * Atomically decrement uses_remaining by 1 for an invite code, only if currently > 0.
+ * Returns { changes: 1 } on success, { changes: 0 } if already at 0.
+ */
+export function atomicDecrementCodeUses(id) {
+  return stmtAtomicDecrementCodeUses.run(id);
 }
 
 export function getCodesByCreator(userId) {

@@ -25,6 +25,7 @@ import {
   getUserById,
   validateInviteCode,
   decrementCodeUses,
+  atomicDecrementCodeUses,
   findInviteCodeById,
   createInviteCode,
   getCodesByCreator,
@@ -42,6 +43,7 @@ import {
   updateUserStatus,
   updateUserUses,
   atomicDecrementUserUses,
+  updateTosAccepted,
 } from './db.js';
 import {
   createJob,
@@ -225,7 +227,18 @@ app.get('/auth/me', (req, res) => {
     status: user.status,
     isAdmin: !!user.is_admin,
     usesRemaining: user.uses_remaining ?? null,
+    tosAccepted: !!user.tos_accepted_at,
   });
+});
+
+/** POST /auth/tos — record that the user has accepted the Terms of Service */
+app.post('/auth/tos', requireActive, (req, res) => {
+  const { accepted } = req.body ?? {};
+  if (accepted !== true) {
+    return res.status(400).json({ error: 'Must explicitly accept terms (accepted: true)' });
+  }
+  updateTosAccepted(req.user.userId);
+  res.json({ ok: true, tosAccepted: true });
 });
 
 /**
@@ -527,6 +540,7 @@ app.get('/admin/users', requireAdmin, (req, res) => {
     status: u.status,
     isAdmin: !!u.is_admin,
     usesRemaining: u.uses_remaining ?? null,
+    tosAccepted: !!u.tos_accepted_at,
     createdAt: u.created_at,
   })));
 });
@@ -591,7 +605,7 @@ if (existsSync(clientDist)) {
 const server = createServer(app);
 
 // ── WebSocket servers (noServer mode, we route upgrades manually) ─────────────
-const wss = new WebSocketServer({ noServer: true, maxPayload: 50 * 1024 * 1024 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 25 * 1024 * 1024 });
 
 // ── Heartbeat — keeps idle connections alive through NAT/firewall/proxy timeouts ─
 // 25 s is conservative enough to beat typical 30 s NAT idle timeouts.
@@ -788,6 +802,11 @@ function handlePhoneSocket(ws, jwtPayload) {
     if (userRow) sendJson(ws, { type: 'uses_updated', usesRemaining: userRow.uses_remaining ?? null });
   }
 
+  // ── Per-socket submit rate limiter (max 10 submits / 60 s sliding window) ────
+  const WS_SUBMIT_WINDOW_MS = 60_000;
+  const WS_SUBMIT_MAX = 10;
+  const submitTimestamps = [];
+
   ws.on('message', (raw) => {
     let msg;
     try {
@@ -797,15 +816,28 @@ function handlePhoneSocket(ws, jwtPayload) {
       return;
     }
 
+    if (typeof msg.type !== 'string') {
+      sendJson(ws, { type: 'error', message: 'Missing message type' });
+      return;
+    }
+
     if (msg.type === 'ping') {
       sendJson(ws, { type: 'pong' });
     } else if (msg.type === 'submit') {
+      // Rate limit submits
+      const now = Date.now();
+      while (submitTimestamps.length && submitTimestamps[0] <= now - WS_SUBMIT_WINDOW_MS) submitTimestamps.shift();
+      if (submitTimestamps.length >= WS_SUBMIT_MAX) {
+        sendJson(ws, { type: 'error', message: 'Rate limit exceeded — try again later' });
+        return;
+      }
+      submitTimestamps.push(now);
       handleJobSubmit(ws, msg, jwtPayload);
     } else if (msg.type === 'cancel') {
-      if (msg.jobId) {
+      if (typeof msg.jobId === 'string' && msg.jobId) {
         updateJobStatus(msg.jobId, 'cancelled');
       }
-      if (pcSocket && pcSocket.readyState === 1) {
+      if (pcSocket && pcSocket.readyState === 1 && typeof msg.jobId === 'string') {
         sendJson(pcSocket, { type: 'cancel', jobId: msg.jobId });
       }
     } else {
@@ -851,6 +883,11 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
       sendJson(phoneWs, { type: 'error', message: 'User not found' });
       return;
     }
+    // ── Terms of Service gate ──────────────────────────────────────────────────
+    if (!userRow.tos_accepted_at) {
+      sendJson(phoneWs, { type: 'error', message: 'tos_not_accepted' });
+      return;
+    }
     if (userRow.uses_remaining !== null) {
       // Finite quota — atomic decrement (prevents TOCTOU race across tabs/sockets)
       const result = atomicDecrementUserUses(jwtPayload.userId);
@@ -870,14 +907,17 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null) {
 
   if (jwtPayload?.type === 'code_user') {
     const codeRow = findInviteCodeById(jwtPayload.codeId);
-    if (!codeRow || (codeRow.uses_remaining !== null && codeRow.uses_remaining <= 0)) {
-      sendJson(phoneWs, { type: 'error', message: 'Access code has no remaining uses' });
+    if (!codeRow) {
+      sendJson(phoneWs, { type: 'error', message: 'Access code not found' });
       return;
     }
     if (codeRow.uses_remaining !== null) {
-      decrementCodeUses(codeRow.id);
+      const result = atomicDecrementCodeUses(codeRow.id);
+      if (result.changes === 0) {
+        sendJson(phoneWs, { type: 'error', message: 'Access code has no remaining uses' });
+        return;
+      }
       notifyAdmins('codes_changed');
-      // Tell the code-user their remaining count so the UI can update proactively
       notifyCodeUsers(jwtPayload.codeId, codeRow.uses_remaining - 1);
     }
   }
