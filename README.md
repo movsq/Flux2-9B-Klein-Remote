@@ -334,11 +334,26 @@ All configuration lives in the single root `.env`. Copy `.env.example` to `.env`
 | `PUBLIC_KEY_PATH` | `public_key.pem` | Path to the PC's public key |
 | `RECONNECT_DELAY` | `5` | Seconds between reconnect attempts (pc-client) |
 | `CLIENT_DIST_PATH` | *(auto)* | Override path to the built Svelte frontend served by the Node.js server |
+| `ALLOWED_ORIGINS` | *(unset)* | Comma-separated list of allowed CORS origins (e.g. `https://yourdomain.com`). **Required in production** — if unset, all origins are allowed (dev only) |
 | `VPS_USER` | `root` | SSH username for manual deployments |
 | `VPS_SSH_HOST` | — | SSH address of the VPS for manual deployments |
 | `VPS_PATH` | `/root/flux2-9b-klein-remote` | Deployment path for manual deployments |
 
-> **`PIN` (deprecated):** The pc-client still accepts `PIN` as a fallback for `PC_SECRET` but will log a warning. Set `PC_SECRET` instead.
+---
+
+## Terms of Service
+
+Google-authenticated users must accept the Terms of Service before they can submit
+generation jobs. The ToS is presented as a modal on first login and re-shown if the
+user attempts to generate without having accepted.
+
+Acceptance is recorded server-side (`tos_accepted_at` timestamp in the `users` table).
+The terms reference Czech Republic applicable law:
+
+- **Contract formation:** § 1724 et seq. of Act No. 89/2012 Coll. (Czech Civil Code)
+- **Data protection:** Regulation (EU) 2016/679 (GDPR) as supplemented by Act No. 110/2019 Coll.
+- **Prohibited content:** Act No. 40/2009 Coll. (Czech Criminal Code), Regulation (EU) 2024/1689 (AI Act)
+- **Governing law:** Czech Republic; disputes resolved by Czech courts
 
 ---
 
