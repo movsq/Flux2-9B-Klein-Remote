@@ -9,6 +9,24 @@ results are visible to it.
 [Phone browser] ──── WSS encrypted ────▶ [VPS relay] ──── WSS encrypted ────▶ [PC + ComfyUI]
 ```
 
+---
+
+## Screenshots
+
+| Login | Generate |
+|:-----:|:--------:|
+| ![Login](docs/screenshots/login.png) | ![Generate](docs/screenshots/submit.png) |
+
+| Admin — Codes | Admin — Users |
+|:-------------:|:-------------:|
+| ![Admin Codes](docs/screenshots/admin-codes.png) | ![Admin Users](docs/screenshots/admin-users.png) |
+
+| Vault Settings | Unlock Vault | Gallery |
+|:--------------:|:------------:|:-------:|
+| ![Vault Settings](docs/screenshots/vault-settings.png) | ![Unlock Vault](docs/screenshots/unlock-vault.png) | ![Gallery](docs/screenshots/gallery.png) |
+
+---
+
 **Why this exists:** I wanted to run Flux 2 on my home PC's GPU and use it from my phone
 without exposing any ports on my home network. The PC connects *outbound* to a cheap VPS
 relay, so no port-forwarding or dynamic DNS is needed — just an internet connection on both

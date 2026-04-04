@@ -25,3 +25,10 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# ── SFTP / FTP config ─────────────────────────────────────────────────────────
+.sftp-config.json
+sftp.json
+.ftpconfig
+.ftpquota
+.lftp/
