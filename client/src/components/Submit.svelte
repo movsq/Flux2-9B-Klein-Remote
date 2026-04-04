@@ -578,37 +578,39 @@
           <span class="form-title">ComfyLink</span>
           <span class="form-sub">FLUX2 9B KLEIN &middot; REMOTE</span>
         </div>
-        {#if isAdmin}
-          <button type="button" class="btn-admin" onclick={onOpenAdmin} aria-label="Admin panel">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="1.3"/>
-              <path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
-              <circle cx="10" cy="17" r="1.2" fill="currentColor"/>
-              <circle cx="3" cy="10" r="1.2" fill="currentColor"/>
-              <circle cx="17" cy="10" r="1.2" fill="currentColor"/>
-            </svg>
-          </button>
-        {/if}
-        {#if showGalleryBtn}
-          <button type="button" class="btn-admin" onclick={onOpenGallery} aria-label="Saved results">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
-              <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
-              <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
-              <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
-            </svg>
-          </button>
-        {/if}
-        {#if showVaultSettingsBtn}
-          <button type="button" class="btn-admin" onclick={onOpenVaultSettings} aria-label="Vault settings">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-              <path d="M7 5V4a3 3 0 016 0v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              <circle cx="10" cy="11" r="1.5" fill="currentColor"/>
-            </svg>
-          </button>
-        {/if}
+        <div class="form-header-right">
+          {#if isAdmin}
+            <button type="button" class="btn-admin" onclick={onOpenAdmin} aria-label="Admin panel">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
+                <circle cx="10" cy="17" r="1.2" fill="currentColor"/>
+                <circle cx="3" cy="10" r="1.2" fill="currentColor"/>
+                <circle cx="17" cy="10" r="1.2" fill="currentColor"/>
+              </svg>
+            </button>
+          {/if}
+          {#if showGalleryBtn}
+            <button type="button" class="btn-admin" onclick={onOpenGallery} aria-label="Saved results">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+                <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+                <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+                <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+            </button>
+          {/if}
+          {#if showVaultSettingsBtn}
+            <button type="button" class="btn-admin" onclick={onOpenVaultSettings} aria-label="Vault settings">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M7 5V4a3 3 0 016 0v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                <circle cx="10" cy="11" r="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+          {/if}
+        </div>
       </div>
 
       <!-- Images -->
@@ -818,7 +820,16 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 0.5rem;
     margin-bottom: 0.2rem;
+  }
+
+  .form-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
   }
 
   .form-header-left {
@@ -840,7 +851,6 @@
     cursor: pointer;
     transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
     flex-shrink: 0;
-    margin-top: 0.2rem;
   }
 
   .btn-admin:hover { background: rgba(255, 255, 255, 0.1); color: #7b9cbf; }
