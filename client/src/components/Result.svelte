@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
   import { encryptBlob, generateThumbnail, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
@@ -30,6 +31,10 @@
     if (!result || !aesKey || _decryptStarted) return;
     _decryptStarted = true;
     decrypt();
+  });
+
+  onDestroy(() => {
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
   });
 
   async function decrypt() {
