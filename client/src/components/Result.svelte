@@ -4,7 +4,7 @@
   import { encryptBlob, generateThumbnail, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
 
-  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null } = $props();
+  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null, onUseAsInput = null } = $props();
 
   let imageUrl = $state(null);
   let imageBytes = $state(null); // raw PNG bytes, kept alongside imageUrl for save
@@ -14,6 +14,9 @@
   let saved = $state(false);
   let saveError = $state('');
   let savePending = $state(false); // waiting for vault unlock/setup before saving
+  let useInputOpen = $state(false);
+  let assigningInput = $state(false);
+  let inputAssignError = $state('');
 
   const DECRYPT_TIMEOUT_MS = 15_000;
   let _decryptInFlight = false; // re-entry guard
@@ -80,6 +83,29 @@
   function retryDecrypt() {
     decryptError = '';
     decrypt();
+  }
+
+  async function assignToInput(slot) {
+    if (!onUseAsInput || !imageBytes || assigningInput || (slot !== 1 && slot !== 2)) return;
+    assigningInput = true;
+    inputAssignError = '';
+    try {
+      const ok = await onUseAsInput({
+        slot,
+        bytes: imageBytes,
+        mime: 'image/png',
+        filename: `result-${result?.jobId ?? 'image'}.png`,
+      });
+      if (ok) {
+        useInputOpen = false;
+      } else {
+        inputAssignError = 'Could not set input right now.';
+      }
+    } catch {
+      inputAssignError = 'Could not set input right now.';
+    } finally {
+      assigningInput = false;
+    }
   }
 
   async function handleSave() {
@@ -161,10 +187,30 @@
           <!-- Code users have no vault: only Discard -->
           <button onclick={onDone} class="btn btn-ghost btn-danger">Discard</button>
         {/if}
+        <div class="use-input-wrap">
+          <button
+            class="btn btn-ghost btn-use-input"
+            onclick={() => { useInputOpen = !useInputOpen; inputAssignError = ''; }}
+            disabled={!imageBytes || assigningInput}
+            aria-haspopup="true"
+            aria-expanded={useInputOpen}
+          >
+            {assigningInput ? 'Assigning…' : 'Use as Input'}
+          </button>
+          {#if useInputOpen}
+            <div class="use-input-picker" role="menu" aria-label="Select input slot">
+              <button class="picker-btn" role="menuitem" onclick={() => assignToInput(1)} disabled={assigningInput}>Input 1</button>
+              <button class="picker-btn" role="menuitem" onclick={() => assignToInput(2)} disabled={assigningInput}>Input 2</button>
+            </div>
+          {/if}
+        </div>
         <!-- After a successful save the result is in the vault — close permanently
              (onDone) so it doesn't linger in the 2-min dismissed shelf. -->
         <button onclick={saved ? onDone : onClose} class="btn btn-ghost btn-close-action">Close</button>
       </div>
+      {#if inputAssignError}
+        <p class="save-error">{inputAssignError}</p>
+      {/if}
       {#if saveError}
         <p class="save-error">{saveError}</p>
       {/if}
@@ -323,6 +369,7 @@
 
   .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
     flex-shrink: 0;
   }
@@ -389,6 +436,56 @@
     border-color: rgba(82, 116, 144, 0.3);
     color: #527490;
     opacity: 0.75;
+  }
+
+  .use-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .btn-use-input {
+    width: 100%;
+  }
+
+  .use-input-picker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 0.45rem);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    padding: 0.45rem;
+    border-radius: 0.75rem;
+    background: rgba(9, 9, 11, 0.96);
+    border: 1px solid rgba(82, 116, 144, 0.35);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  }
+
+  .picker-btn {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: #d1dae3;
+    border-radius: 0.6rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 0.2rem;
+    cursor: pointer;
+  }
+
+  .picker-btn:hover {
+    background: rgba(82, 116, 144, 0.28);
+    border-color: rgba(82, 116, 144, 0.52);
+    color: #eef3f8;
+  }
+
+  .picker-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   .save-error {

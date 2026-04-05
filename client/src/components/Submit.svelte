@@ -9,7 +9,7 @@
     encodeJobPayload,
   } from '../lib/crypto.js';
 
-  let { token, ws, onJobSubmitted, onCancel = () => {}, seed = $bindable(), seedMode = $bindable(), onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null, userUsesRemaining = null, queueState = { queue: [], activeJobId: null, avgDuration: 60 }, pendingJobs = new Map(), dismissedResults = [], clockNow = Date.now(), onReopenDismissed = null, wsConnected = false } = $props();
+  let { token, ws, onJobSubmitted, onCancel = () => {}, seed = $bindable(), seedMode = $bindable(), onNewJob, isAdmin = false, onOpenAdmin, showGalleryBtn = false, onOpenGallery, showVaultSettingsBtn = false, onOpenVaultSettings, codeUsesRemaining = null, userUsesRemaining = null, queueState = { queue: [], activeJobId: null, avgDuration: 60 }, pendingJobs = new Map(), dismissedResults = [], clockNow = Date.now(), onReopenDismissed = null, wsConnected = false, onRegisterInputSetter = () => {} } = $props();
 
   let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
   let userDepleted = $derived(userUsesRemaining !== null && userUsesRemaining === 0);
@@ -180,6 +180,41 @@
     imageFile2 = file;
     imagePreviewUrl2 = URL.createObjectURL(file);
   }
+
+  function normalizeBytes(bytes) {
+    if (!bytes) return null;
+    if (bytes instanceof Uint8Array) return bytes;
+    if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
+    if (ArrayBuffer.isView(bytes)) {
+      return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+    return null;
+  }
+
+  function extFromMime(mime) {
+    if (mime === 'image/jpeg') return 'jpg';
+    if (mime === 'image/webp') return 'webp';
+    return 'png';
+  }
+
+  function applyPreviewInput({ slot, bytes, mime = 'image/png', filename = null }) {
+    const normalized = normalizeBytes(bytes);
+    if (!normalized) return false;
+
+    const targetSlot = slot === 2 ? 2 : 1;
+    const useMime = typeof mime === 'string' && mime.length > 0 ? mime : 'image/png';
+    const fallbackName = `input-${targetSlot}.${extFromMime(useMime)}`;
+    const file = new File([normalized], filename || fallbackName, { type: useMime });
+
+    if (targetSlot === 1) setSlot1(file);
+    else setSlot2(file);
+    return true;
+  }
+
+  $effect(() => {
+    onRegisterInputSetter(applyPreviewInput);
+    return () => onRegisterInputSetter(null);
+  });
 
   function handleFileChange1(e) {
     const file = e.target.files?.[0];

@@ -30,6 +30,9 @@
   let wsError = $state('');
   let wsState = $state('disconnected'); // connected | reconnecting | exhausted | connecting | disconnected
   let wsFailedAttempts = $state(0);
+  let submitInputSetter = null;
+  let inputToast = $state('');
+  let inputToastTimer = null;
   let codeUsesRemaining = $state(null); // null = not a code user or unlimited; 0 = depleted
   let userUsesRemaining = $state(null); // null = unlimited; number = remaining uses for Google user
   let showAdmin = $state(false);
@@ -370,6 +373,30 @@
     }
   }
 
+  function registerSubmitInputSetter(setter) {
+    submitInputSetter = typeof setter === 'function' ? setter : null;
+  }
+
+  function showInputToastMessage(message) {
+    inputToast = message;
+    if (inputToastTimer) clearTimeout(inputToastTimer);
+    inputToastTimer = setTimeout(() => {
+      inputToast = '';
+      inputToastTimer = null;
+    }, 1800);
+  }
+
+  async function handleUseAsInput({ slot, bytes, mime = 'image/png', filename = 'input.png' }) {
+    if (!submitInputSetter || (slot !== 1 && slot !== 2) || !bytes) return false;
+    try {
+      const assigned = await submitInputSetter({ slot, bytes, mime, filename });
+      if (assigned) showInputToastMessage(`Set as Input ${slot}`);
+      return !!assigned;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Modal close: dismiss front result to recovery shelf (remaining time of its 2-min window) ──
   function handleClose() {
     if (resultStack.length === 0) return;
@@ -417,6 +444,9 @@
   }
 
   onDestroy(() => ws?.close());
+  onDestroy(() => {
+    if (inputToastTimer) clearTimeout(inputToastTimer);
+  });
 
   function retryConnection() {
     ws?.reconnectNow?.();
@@ -444,6 +474,7 @@
       {token} {ws}
       onJobSubmitted={handleJobSubmitted}
       onCancel={handleJobCancelled}
+      onRegisterInputSetter={registerSubmitInputSetter}
       bind:seed bind:seedMode
       onNewJob={handleDone}
       isAdmin={user?.isAdmin}
@@ -480,6 +511,7 @@
         {masterKey}
         userType={user?.type ?? 'google'}
         onRequestVaultUnlock={requestVaultUnlock}
+        onUseAsInput={handleUseAsInput}
       />
     {/each}
   {/if}
@@ -526,6 +558,7 @@
       {token}
       {masterKey}
       onClose={() => showGallery = false}
+      onUseAsInput={handleUseAsInput}
     />
   {/if}
 
@@ -536,6 +569,10 @@
       onAccepted={() => { tosAccepted = true; showTerms = false; }}
       onDeclined={() => { showTerms = true; }}
     />
+  {/if}
+
+  {#if inputToast}
+    <div class="input-toast" role="status" aria-live="polite">{inputToast}</div>
   {/if}
 </div>
 
@@ -596,6 +633,24 @@
   .ws-meta {
     color: rgba(228, 228, 231, 0.7);
     font-size: 0.64rem;
+  }
+
+  .input-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.2rem;
+    transform: translateX(-50%);
+    padding: 0.58rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(82, 116, 144, 0.45);
+    background: rgba(10, 14, 20, 0.92);
+    color: #dbe4eb;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    z-index: 220;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
   }
 
 

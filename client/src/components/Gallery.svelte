@@ -2,7 +2,7 @@
   import { listResults, getResultFull, deleteResult } from '../lib/api.js';
   import { decryptBlob, b64ToBuf } from '../lib/vault-crypto.js';
 
-  let { token, masterKey, onClose } = $props();
+  let { token, masterKey, onClose, onUseAsInput = null } = $props();
 
   let items = $state([]);
   let loading = $state(true);
@@ -15,8 +15,12 @@
   // Full-view state
   let viewingId = $state(null);
   let viewUrl = $state(null);
+  let viewBytes = $state(null);
   let viewLoading = $state(false);
   let viewError = $state('');
+  let useInputOpen = $state(false);
+  let assigningInput = $state(false);
+  let inputAssignError = $state('');
 
   // Delete state
   let deletingId = $state(null);
@@ -73,13 +77,17 @@
   async function viewFull(id) {
     viewingId = id;
     viewUrl = null;
+    viewBytes = null;
     viewLoading = true;
     viewError = '';
+    useInputOpen = false;
+    inputAssignError = '';
     try {
       const data = await getResultFull(token, id);
       const encBuf = b64ToBuf(data.encryptedFull);
       const ivBuf = b64ToBuf(data.ivFull);
       const plain = await decryptBlob(masterKey, ivBuf, encBuf);
+      viewBytes = plain;
       const blob = new Blob([plain], { type: 'image/png' });
       viewUrl = URL.createObjectURL(blob);
     } catch (err) {
@@ -93,7 +101,33 @@
     if (viewUrl) URL.revokeObjectURL(viewUrl);
     viewingId = null;
     viewUrl = null;
+    viewBytes = null;
     viewError = '';
+    useInputOpen = false;
+    inputAssignError = '';
+  }
+
+  async function assignToInput(slot) {
+    if (!onUseAsInput || !viewBytes || assigningInput || (slot !== 1 && slot !== 2)) return;
+    assigningInput = true;
+    inputAssignError = '';
+    try {
+      const ok = await onUseAsInput({
+        slot,
+        bytes: viewBytes,
+        mime: 'image/png',
+        filename: `vault-${viewingId}.png`,
+      });
+      if (ok) {
+        useInputOpen = false;
+      } else {
+        inputAssignError = 'Could not set input right now.';
+      }
+    } catch {
+      inputAssignError = 'Could not set input right now.';
+    } finally {
+      assigningInput = false;
+    }
   }
 
   async function handleDelete(id) {
@@ -184,7 +218,30 @@
           <button class="btn btn-danger" onclick={() => handleDelete(viewingId)} disabled={deletingId === viewingId}>
             {deletingId === viewingId ? 'Deleting…' : 'Delete'}
           </button>
+          <button class="btn btn-ghost" onclick={closeView}>Close</button>
         </div>
+        <div class="use-input-row">
+          <div class="use-input-wrap">
+            <button
+              class="btn btn-ghost"
+              onclick={() => { useInputOpen = !useInputOpen; inputAssignError = ''; }}
+              disabled={!viewBytes || assigningInput}
+              aria-haspopup="true"
+              aria-expanded={useInputOpen}
+            >
+              {assigningInput ? 'Assigning…' : 'Use as Input'}
+            </button>
+            {#if useInputOpen}
+              <div class="use-input-picker" role="menu" aria-label="Select input slot">
+                <button class="picker-btn" role="menuitem" onclick={() => assignToInput(1)} disabled={assigningInput}>Input 1</button>
+                <button class="picker-btn" role="menuitem" onclick={() => assignToInput(2)} disabled={assigningInput}>Input 2</button>
+              </div>
+            {/if}
+          </div>
+        </div>
+        {#if inputAssignError}
+          <p class="error">{inputAssignError}</p>
+        {/if}
       {/if}
     </div>
   </div>
@@ -350,11 +407,31 @@
   }
 
   .view-actions {
-    display: flex; gap: 0.75rem; width: 100%; max-width: 320px;
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 520px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .use-input-row {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .use-input-wrap {
+    width: 100%;
+    max-width: 320px;
+    position: relative;
   }
 
   .btn {
-    flex: 1; padding: 0.7rem;
+    flex: 1;
+    min-width: 120px;
+    padding: 0.7rem;
     border: none; border-radius: 3rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; letter-spacing: 0.08em;
@@ -374,4 +451,52 @@
   }
   .btn-danger:hover { background: rgba(196, 112, 112, 0.25); }
   .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.06);
+    color: #c2ccd5;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e4e4e7;
+  }
+
+  .use-input-picker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 0.45rem);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    padding: 0.45rem;
+    border-radius: 0.75rem;
+    background: rgba(9, 9, 11, 0.96);
+    border: 1px solid rgba(82, 116, 144, 0.35);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  }
+
+  .picker-btn {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: #d1dae3;
+    border-radius: 0.6rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 0.2rem;
+    cursor: pointer;
+  }
+
+  .picker-btn:hover {
+    background: rgba(82, 116, 144, 0.28);
+    border-color: rgba(82, 116, 144, 0.52);
+    color: #eef3f8;
+  }
+
+  .picker-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 </style>
