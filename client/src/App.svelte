@@ -263,6 +263,32 @@
     showVaultSettings = true;
   }
 
+  /** Request a fresh Google ID token for step-up auth (vault rekey/delete). */
+  function requestFreshGoogleToken() {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.accounts) {
+        reject(new Error('Google Sign-In not available'));
+        return;
+      }
+      google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: (response) => {
+          if (response.credential) {
+            resolve(response.credential);
+          } else {
+            reject(new Error('Re-authentication cancelled'));
+          }
+        },
+        auto_select: false,
+      });
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          reject(new Error('Please sign in with Google again to confirm this action'));
+        }
+      });
+    });
+  }
+
   // ── Submit ─────────────────────────────────────────────────────────────────
   function handleJobSubmitted({ aesKey, jobId, promptText, preview1, preview2 }) {
     pendingJobs.set(jobId, { aesKey, promptText, preview1, preview2 });
@@ -405,6 +431,7 @@
       {vaultInfo}
       {masterKey}
       userEmail={user?.email ?? ''}
+      {requestFreshGoogleToken}
       onClose={() => showVaultSettings = false}
       onUpdated={() => { showVaultSettings = false; checkVault(); }}
       onRequestUnlock={() => { showVaultSettings = false; pendingVaultAction = () => { showVaultSettings = true; }; requestVaultUnlock(); }}

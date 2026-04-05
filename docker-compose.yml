@@ -11,6 +11,9 @@ services:
       - SESSION_TTL_MS=${SESSION_TTL_MS:-86400000}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - DB_PATH=/app/data/comfylink.db
+      - BEHIND_PROXY=true
+      - DEPLOY_MODE=${DEPLOY_MODE:-remote}
+      - MAX_RESULTS_PER_USER=${MAX_RESULTS_PER_USER:-500}
     volumes:
       - server_data:/app/data
 

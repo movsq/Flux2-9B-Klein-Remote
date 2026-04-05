@@ -201,6 +201,10 @@ const stmtDeleteAllResultsByUser = db.prepare(
   'DELETE FROM stored_results WHERE user_id = ?',
 );
 
+const stmtCountResultsByUser = db.prepare(
+  'SELECT COUNT(*) AS cnt FROM stored_results WHERE user_id = ?',
+);
+
 const stmtDeleteVault = db.prepare(
   'DELETE FROM vault_keys WHERE user_id = ?',
 );
@@ -390,6 +394,10 @@ export function getStoredResultFull(id, userId) {
 
 export function deleteStoredResult(id, userId) {
   return stmtDeleteResult.run(id, userId);
+}
+
+export function countStoredResults(userId) {
+  return stmtCountResultsByUser.get(userId)?.cnt ?? 0;
 }
 
 // Admin: user management

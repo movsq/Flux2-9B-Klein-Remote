@@ -38,6 +38,7 @@ import {
   listStoredResults,
   getStoredResultFull,
   deleteStoredResult,
+  countStoredResults,
   getAllUsers,
   updateUserStatus,
   updateUserUses,
@@ -58,6 +59,7 @@ import {
 } from './jobs.js';
 
 const MAX_QUEUE_PER_USER = 3;
+const MAX_RESULTS_PER_USER = parseInt(process.env.MAX_RESULTS_PER_USER ?? '500', 10);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -157,13 +159,19 @@ function sendJson(ws, obj) {
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
 
-// Trust the Caddy reverse proxy so req.ip is the real client IP, not the
-// container IP. Without this, all users share one rate-limit bucket.
-app.set('trust proxy', 1);
+// Trust a reverse proxy (Caddy/nginx) so req.ip is the real client IP, not the
+// container IP. Only enabled when BEHIND_PROXY=true — without a proxy, trusting
+// X-Forwarded-For lets clients forge their IP to bypass rate limiting.
+if (process.env.BEHIND_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : undefined; // undefined = allow all in dev
+if (!allowedOrigins && process.env.DEPLOY_MODE === 'remote') {
+  console.warn('[security] WARNING: ALLOWED_ORIGINS is not set in remote mode — CORS allows all origins.');
+}
 app.use(cors(allowedOrigins ? { origin: allowedOrigins } : undefined));
 app.use(express.json({ limit: '20mb' }));
 
@@ -448,10 +456,23 @@ app.post('/vault/unlock', requireActive, (req, res) => {
 });
 
 /** POST /vault/rekey — re-wrap master key with new wrapping keys */
-app.post('/vault/rekey', requireActive, (req, res) => {
+app.post('/vault/rekey', requireActive, async (req, res) => {
   const userId = req.user.userId;
   const existing = getVaultByUser(userId);
   if (!existing) return res.status(404).json({ error: 'No vault configured' });
+
+  // ── Step-up auth: require a fresh Google ID token to prove identity ────────
+  const { idToken } = req.body ?? {};
+  if (!idToken) return res.status(400).json({ error: 'Re-authentication required (idToken)' });
+  try {
+    const googleUser = await verifyGoogleToken(idToken);
+    const user = getUserById(userId);
+    if (!user || user.google_sub !== googleUser.sub) {
+      return res.status(403).json({ error: 'Re-authentication failed' });
+    }
+  } catch {
+    return res.status(401).json({ error: 'Invalid Google token' });
+  }
 
   const {
     encryptedMasterKeyBio, encryptedMasterKeyPw, encryptedMasterKeyRecovery,
@@ -472,9 +493,22 @@ app.post('/vault/rekey', requireActive, (req, res) => {
 });
 
 /** DELETE /vault — permanently delete vault + all encrypted results */
-app.delete('/vault', requireActive, (req, res) => {
+app.delete('/vault', requireActive, async (req, res) => {
   const vault = getVaultByUser(req.user.userId);
   if (!vault) return res.status(404).json({ error: 'No vault configured' });
+
+  // ── Step-up auth: require a fresh Google ID token to prove identity ────────
+  const { idToken } = req.body ?? {};
+  if (!idToken) return res.status(400).json({ error: 'Re-authentication required (idToken)' });
+  try {
+    const googleUser = await verifyGoogleToken(idToken);
+    const user = getUserById(req.user.userId);
+    if (!user || user.google_sub !== googleUser.sub) {
+      return res.status(403).json({ error: 'Re-authentication failed' });
+    }
+  } catch {
+    return res.status(401).json({ error: 'Invalid Google token' });
+  }
 
   deleteVault(req.user.userId);
   res.json({ ok: true });
@@ -488,6 +522,11 @@ app.post('/results', requireActive, express.json({ limit: '25mb' }), (req, res) 
 
   if (!encryptedThumb || !encryptedFull || !ivThumb || !ivFull) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // ── Per-user storage quota ──────────────────────────────────────────────────
+  if (countStoredResults(req.user.userId) >= MAX_RESULTS_PER_USER) {
+    return res.status(429).json({ error: `Storage limit reached (max ${MAX_RESULTS_PER_USER} results)` });
   }
 
   if (typeof encryptedFull !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(encryptedFull)) {
@@ -679,7 +718,47 @@ const heartbeatTimer = setInterval(() => {
 }, PING_INTERVAL_MS);
 server.on('close', () => clearInterval(heartbeatTimer));
 
+// ── WS upgrade rate limiter ────────────────────────────────────────────────
+// Tracks connection attempts per IP to prevent unauthenticated connection
+// flooding (especially /ws/pc which holds sockets for 10 s before auth timeout).
+const WS_RATE_WINDOW_MS = 60_000;
+const WS_RATE_MAX = 20; // max upgrade attempts per IP per window
+const wsUpgradeTracker = new Map(); // Map<ip, { count, resetAt }>
+
+// Prune stale entries from the WS upgrade tracker every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of wsUpgradeTracker) {
+    if (now >= entry.resetAt) wsUpgradeTracker.delete(ip);
+  }
+}, 5 * 60_000);
+
+function getUpgradeIp(req) {
+  // When behind a reverse proxy, trust the first X-Forwarded-For hop.
+  // Otherwise use the raw socket address (matches trust proxy conditional below).
+  if (process.env.BEHIND_PROXY === 'true') {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) return forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress;
+}
+
 server.on('upgrade', async (req, socket, head) => {
+  // ── Per-IP rate limit for WS upgrades ───────────────────────────────────
+  const ip = getUpgradeIp(req);
+  const now = Date.now();
+  let entry = wsUpgradeTracker.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + WS_RATE_WINDOW_MS };
+    wsUpgradeTracker.set(ip, entry);
+  }
+  entry.count++;
+  if (entry.count > WS_RATE_MAX) {
+    socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname === '/ws/admin') {
@@ -852,10 +931,13 @@ function handlePcMessage(raw) {
     if (job) {
       updateJobStatus(msg.jobId, 'error');
       if (job.phoneWs?.readyState === 1) {
-        sendJson(job.phoneWs, { type: 'error', jobId: msg.jobId, message: msg.message });
+        // Never forward raw PC error messages to clients — they may contain
+        // Python tracebacks, file paths, or library version info.
+        sendJson(job.phoneWs, { type: 'error', jobId: msg.jobId, message: 'Processing failed' });
       }
       deleteJob(msg.jobId);
     }
+    // Full error detail is logged server-side only
     console.warn(`[pc] Error for job ${msg.jobId}: ${msg.message}`);
     // Dispatch next job after error
     dispatchNextJob();
@@ -895,6 +977,25 @@ function handlePhoneSocket(ws, jwtPayload) {
   // Send initial queue state
   const initialState = getQueueState(queueUserId);
   sendJson(ws, { type: 'queue_update', ...initialState, maxQueuePerUser: MAX_QUEUE_PER_USER });
+
+  // ── Periodic re-validation: close socket if user is no longer active ────────
+  const WS_REVALIDATE_MS = 5 * 60_000; // 5 minutes
+  const revalidateTimer = setInterval(() => {
+    if (jwtPayload.type === 'code_user') {
+      const code = findInviteCodeById(jwtPayload.codeId);
+      if (!code || (code.uses_remaining !== null && code.uses_remaining <= 0) ||
+          (code.expires_at !== null && Date.now() > code.expires_at)) {
+        sendJson(ws, { type: 'error', message: 'access_code_expired' });
+        ws.close(4003, 'Access code expired');
+      }
+    } else if (jwtPayload.userId) {
+      const user = getUserById(jwtPayload.userId);
+      if (!user || user.status !== 'active') {
+        sendJson(ws, { type: 'error', message: 'account_suspended' });
+        ws.close(4003, 'Account no longer active');
+      }
+    }
+  }, WS_REVALIDATE_MS);
 
   // ── Per-socket submit rate limiter (max 10 submits / 60 s sliding window) ────
   const WS_SUBMIT_WINDOW_MS = 60_000;
@@ -955,6 +1056,7 @@ function handlePhoneSocket(ws, jwtPayload) {
   });
 
   ws.on('close', () => {
+    clearInterval(revalidateTimer);
     unregisterPhoneSocket(ws);
     if (jwtPayload.type === 'code_user') {
       unregisterCodeSocket(jwtPayload.codeId, ws);
@@ -997,6 +1099,11 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null) {
     const userRow = getUserById(jwtPayload.userId);
     if (!userRow) {
       sendJson(phoneWs, { type: 'error', message: 'User not found' });
+      return;
+    }
+    // ── Suspended check — catches users suspended while their WS was open ─────
+    if (userRow.status !== 'active') {
+      sendJson(phoneWs, { type: 'error', message: 'account_suspended' });
       return;
     }
     // ── Terms of Service gate ──────────────────────────────────────────────────
@@ -1062,7 +1169,16 @@ function handleAdminSocket(ws, userId) {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
+  // ── Periodic re-validation: close if admin is suspended or demoted ────────
+  const revalidateTimer = setInterval(() => {
+    const user = getUserById(userId);
+    if (!user || user.status !== 'active' || !user.is_admin) {
+      ws.close(4003, 'No longer admin');
+    }
+  }, 5 * 60_000);
+
   ws.on('close', () => {
+    clearInterval(revalidateTimer);
     adminSockets.delete(ws);
     console.log(`[admin-ws] Disconnected (user ${userId}).`);
   });
