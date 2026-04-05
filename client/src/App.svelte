@@ -241,8 +241,10 @@
       checkVault();
     }
 
-    // Show terms modal if not yet accepted (Google users only)
-    if (isGoogleUser && !tosAccepted) {
+    // Show terms modal if not yet accepted.
+    // Code users: acceptance is session-local (resets on every reload / new session).
+    // Google users: acceptance is persisted server-side.
+    if (!tosAccepted) {
       showTerms = true;
     }
 
@@ -498,9 +500,10 @@
     />
   {/if}
 
-  {#if showTerms && isGoogleUser}
+  {#if showTerms}
     <TermsModal
       {token}
+      isCodeUser={!isGoogleUser}
       onAccepted={() => { tosAccepted = true; showTerms = false; }}
       onDeclined={() => { showTerms = true; }}
     />

@@ -67,9 +67,11 @@ The code's validity (expiry, remaining uses) is re-checked on every WebSocket au
 
 ## Terms of Service
 
-Google-authenticated users must accept the Terms of Service before they can submit jobs. The ToS is presented as a modal on first login and re-shown if the user attempts to generate without having accepted.
+All users are subject to the Terms of Service regardless of how they authenticate.
 
-Acceptance is recorded server-side (`tos_accepted_at` timestamp in the `users` table).
+**Google-authenticated users** must explicitly accept via the ToS modal — presented on first login and re-shown if the user attempts to generate without having accepted. Acceptance is recorded server-side (`tos_accepted_at` timestamp in the `users` table).
+
+**Access code users** are bound by the same terms upon first use of the Service. The ToS (Section 5) expressly identifies invite-code access as a covered access method; admins issuing `job_access` codes are expected to make recipients aware of the terms before distribution.
 
 The terms reference Czech Republic applicable law:
 

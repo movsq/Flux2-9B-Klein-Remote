@@ -1,7 +1,7 @@
 <script>
   import { acceptTos } from '../lib/api.js';
 
-  let { token, onAccepted, onDeclined } = $props();
+  let { token, isCodeUser = false, onAccepted, onDeclined } = $props();
 
   let loading = $state(false);
   let error = $state('');
@@ -26,7 +26,11 @@
     loading = true;
     error = '';
     try {
-      await acceptTos(token);
+      // Code users have no server-side row — acceptance is session-local only.
+      // The /auth/tos endpoint uses requireActive and would reject code JWTs.
+      if (!isCodeUser) {
+        await acceptTos(token);
+      }
       onAccepted();
     } catch (err) {
       error = err.message;

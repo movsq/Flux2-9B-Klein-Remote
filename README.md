@@ -178,7 +178,11 @@ Flux2-9B-Klein-Remote/
 
 ## Terms of Service
 
-Google-authenticated users must accept the Terms of Service before submitting jobs. The ToS modal is shown on first login and re-shown if a user attempts to generate without having accepted. Acceptance is recorded server-side (`tos_accepted_at` in the `users` table).
+All users are subject to the Terms of Service regardless of how they authenticate.
+
+**Google-authenticated users** must explicitly accept via the ToS modal — shown on first login and re-shown if a user attempts to generate without having accepted. Acceptance is recorded server-side (`tos_accepted_at` in the `users` table).
+
+**Access code users** are bound by the same terms upon first use of the Service. The ToS (Section 5) expressly identifies invite-code access as a covered access method; admins issuing `job_access` codes are expected to make recipients aware of the terms before distribution.
 
 The terms operate under the following legal framework:
 
