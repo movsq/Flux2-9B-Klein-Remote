@@ -185,9 +185,36 @@ function dispatchNextJob() {
   broadcastQueueUpdate();
 }
 function sendJson(ws, obj) {
-  if (ws.readyState === 1 /* OPEN */) {
+  if (!ws) return false;
+  if (ws.readyState !== 1 /* OPEN */) return false;
+  try {
     ws.send(JSON.stringify(obj));
+    return true;
+  } catch {
+    return false;
   }
+}
+
+function getSessionInvalidReason(jwtPayload, rawToken) {
+  const verified = verifyJwt(rawToken);
+  if (!verified) return 'token_expired';
+
+  if (jwtPayload.type === 'code_user') {
+    const code = findInviteCodeById(jwtPayload.codeId);
+    if (!code) return 'code_not_found';
+    if (code.expires_at !== null && Date.now() > code.expires_at) return 'code_expired';
+    if (code.uses_remaining !== null && code.uses_remaining <= 0) return 'code_exhausted';
+    return null;
+  }
+
+  const user = getUserById(jwtPayload.userId);
+  if (!user || user.status !== 'active') return 'account_suspended';
+  return null;
+}
+
+function invalidatePhoneSession(ws, reason) {
+  sendJson(ws, { type: 'session_invalid', reason });
+  ws.close(4003, 'Session invalid');
 }
 
 // ── Express app ───────────────────────────────────────────────────────────────
@@ -987,10 +1014,7 @@ function handlePcMessage(raw) {
       return;
     }
     completeJob(msg.jobId, msg.payload);
-    const deliveredLive = job.phoneWs?.readyState === 1;
-    if (deliveredLive) {
-      sendJson(job.phoneWs, { type: 'result', jobId: msg.jobId, payload: msg.payload });
-    }
+    const deliveredLive = sendJson(job.phoneWs, { type: 'result', jobId: msg.jobId, payload: msg.payload });
     console.log(`[pc] Job ${msg.jobId} completed.`);
     // If nobody is currently connected for this owner, keep the completed job
     // in memory and replay it on next reconnect.
@@ -1084,11 +1108,11 @@ function handlePhoneSocket(ws) {
     }
 
     sendJson(ws, { type: 'auth_ok' });
-    handlePhoneSocketAuthenticated(ws, payload);
+    handlePhoneSocketAuthenticated(ws, payload, msg.token);
   });
 }
 
-function handlePhoneSocketAuthenticated(ws, jwtPayload) {
+function handlePhoneSocketAuthenticated(ws, jwtPayload, rawToken) {
   console.log(`[phone] Connected (${jwtPayload.type === 'code_user' ? 'code' : 'google'}).`);
 
   // Stable userId for quota accounting (shared per code)
@@ -1145,26 +1169,17 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload) {
       deleteJob(job.id);
       continue;
     }
-    sendJson(ws, { type: 'result', jobId: job.id, payload });
+    const delivered = sendJson(ws, { type: 'result', jobId: job.id, payload });
+    if (!delivered) break;
     deleteJob(job.id);
   }
 
   // ── Periodic re-validation: close socket if user is no longer active ────────
-  const WS_REVALIDATE_MS = 5 * 60_000; // 5 minutes
+  const WS_REVALIDATE_MS = 60_000; // 1 minute
   const revalidateTimer = setInterval(() => {
-    if (jwtPayload.type === 'code_user') {
-      const code = findInviteCodeById(jwtPayload.codeId);
-      if (!code || (code.uses_remaining !== null && code.uses_remaining <= 0) ||
-          (code.expires_at !== null && Date.now() > code.expires_at)) {
-        sendJson(ws, { type: 'error', message: 'access_code_expired' });
-        ws.close(4003, 'Access code expired');
-      }
-    } else if (jwtPayload.userId) {
-      const user = getUserById(jwtPayload.userId);
-      if (!user || user.status !== 'active') {
-        sendJson(ws, { type: 'error', message: 'account_suspended' });
-        ws.close(4003, 'Account no longer active');
-      }
+    const reason = getSessionInvalidReason(jwtPayload, rawToken);
+    if (reason) {
+      invalidatePhoneSession(ws, reason);
     }
   }, WS_REVALIDATE_MS);
 
@@ -1190,6 +1205,11 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload) {
     if (msg.type === 'ping') {
       sendJson(ws, { type: 'pong' });
     } else if (msg.type === 'submit') {
+      const reason = getSessionInvalidReason(jwtPayload, rawToken);
+      if (reason) {
+        invalidatePhoneSession(ws, reason);
+        return;
+      }
       // Rate limit submits
       const now = Date.now();
       while (submitTimestamps.length && submitTimestamps[0] <= now - WS_SUBMIT_WINDOW_MS) submitTimestamps.shift();
@@ -1200,6 +1220,11 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload) {
       submitTimestamps.push(now);
       handleJobSubmit(ws, msg, jwtPayload, queueUserId, wsSessionId);
     } else if (msg.type === 'cancel') {
+      const reason = getSessionInvalidReason(jwtPayload, rawToken);
+      if (reason) {
+        invalidatePhoneSession(ws, reason);
+        return;
+      }
       // Validate jobId length to prevent oversized strings probing internal state
       if (typeof msg.jobId === 'string' && msg.jobId && msg.jobId.length <= 64) {
         const job = getJob(msg.jobId);

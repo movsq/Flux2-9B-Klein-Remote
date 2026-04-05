@@ -1,7 +1,7 @@
 <script>
   import { loginWithGoogle, loginWithCode } from '../lib/api.js';
 
-  let { onLogin, exiting = false } = $props();
+  let { onLogin, exiting = false, notice = '' } = $props();
 
   let error = $state('');
   let loading = $state(false);
@@ -150,6 +150,10 @@
         {/if}
       </div>
 
+      {#if notice}
+        <p class="notice">{notice}</p>
+      {/if}
+
       {#if error}
         <p class="error">{error}</p>
       {/if}
@@ -183,6 +187,10 @@
       <button type="submit" disabled={loading || !accessCode.trim()}>
         {loading ? 'VERIFYING…' : 'ENTER'}
       </button>
+
+      {#if notice}
+        <p class="notice">{notice}</p>
+      {/if}
 
       {#if error}
         <p class="error">{error}</p>
@@ -226,6 +234,10 @@
         </button>
       {/if}
 
+      {#if notice}
+        <p class="notice">{notice}</p>
+      {/if}
+
       {#if error}
         <p class="error">{error}</p>
       {/if}
@@ -245,6 +257,10 @@
         </svg>
         <p>Your account is pending admin approval. You'll be able to sign in once approved.</p>
       </div>
+
+      {#if notice}
+        <p class="notice">{notice}</p>
+      {/if}
 
       <button type="button" onclick={() => { step = 'google'; error = ''; }}>
         BACK TO SIGN IN
@@ -312,6 +328,19 @@
     letter-spacing: 0.18em;
     color: #527490;
     font-weight: 400;
+  }
+
+  .notice {
+    margin: -0.35rem 0 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(196, 153, 106, 0.35);
+    border-radius: 0.65rem;
+    background: rgba(196, 153, 106, 0.08);
+    color: #f3d5b2;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-align: center;
   }
 
   .google-btn-wrap {

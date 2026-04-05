@@ -28,8 +28,9 @@
   // Ticker for countdown displays
   let clockNow = $state(Date.now());
   let wsError = $state('');
-  let wsState = $state('disconnected'); // connected | reconnecting | exhausted | connecting | disconnected
+  let wsState = $state('disconnected'); // connected | reconnecting | exhausted | connecting | auth_invalid | disconnected
   let wsFailedAttempts = $state(0);
+  let sessionNotice = $state('');
   let submitInputSetter = null;
   let inputToast = $state('');
   let inputToastTimer = null;
@@ -114,6 +115,7 @@
       token = newToken;
       user = newUser;
       view = 'submit';
+      sessionNotice = '';
       tosAccepted = !!newUser.tosAccepted;
 
       // Initialise quota for Google users from login response
@@ -203,7 +205,13 @@
         wsError = 'Connection lost — reconnecting...';
       } else if (state === 'exhausted') {
         wsError = 'Reconnect failed. Tap Retry Connection to resume live updates.';
+      } else if (state === 'auth_invalid') {
+        wsError = 'Session expired. Please sign in again.';
       }
+    });
+
+    ws.on('session_invalid', ({ reason }) => {
+      forceRelogin(reason);
     });
 
     ws.on('queue_update', (msg) => {
@@ -451,6 +459,52 @@
   function retryConnection() {
     ws?.reconnectNow?.();
   }
+
+  function formatSessionReason(reason) {
+    if (reason === 'token_expired') return 'Session expired while idle.';
+    if (reason === 'code_expired') return 'Access code expired.';
+    if (reason === 'code_exhausted') return 'Access code has no remaining uses.';
+    if (reason === 'account_suspended') return 'Account is no longer active.';
+    if (reason === 'code_not_found') return 'Access code is no longer valid.';
+    return 'Session expired. Please sign in again.';
+  }
+
+  function clearResultCards() {
+    for (const item of resultStack) {
+      if (item?.imageUrl) URL.revokeObjectURL(item.imageUrl);
+    }
+    for (const item of dismissedResults) {
+      if (item?.timerId) clearTimeout(item.timerId);
+      if (item?.imageUrl) URL.revokeObjectURL(item.imageUrl);
+    }
+    resultStack = [];
+    dismissedResults = [];
+  }
+
+  function forceRelogin(reason) {
+    clearResultCards();
+    ws?.close?.();
+    ws = null;
+    token = null;
+    user = null;
+    view = 'login';
+    wsError = '';
+    wsState = 'disconnected';
+    wsFailedAttempts = 0;
+    sessionNotice = formatSessionReason(reason);
+    queueState = { queue: [], activeJobId: null, avgDuration: 60 };
+    pendingJobs = new Map();
+    showAdmin = false;
+    showGallery = false;
+    showTerms = false;
+    showVaultSetup = false;
+    showVaultUnlock = false;
+    showVaultSettings = false;
+    vaultInfo = null;
+    masterKey = null;
+    pendingVaultAction = null;
+    closeTabChannel();
+  }
 </script>
 
 <div class="app">
@@ -468,7 +522,7 @@
   {/if}
 
   {#if view === 'login'}
-    <Login onLogin={handleLogin} exiting={loginExiting} />
+    <Login onLogin={handleLogin} exiting={loginExiting} notice={sessionNotice} />
   {:else if view === 'submit'}
     <Submit
       {token} {ws}

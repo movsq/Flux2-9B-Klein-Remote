@@ -43,6 +43,8 @@
   let adminWs = null;
   let adminWsReconnectTimer = null;
   let _reconnectDelay = 2000; // exponential backoff state
+  let wsStatus = $state('connecting'); // connecting | connected | reconnecting
+  let wsStatusText = $state('Connecting live updates...');
 
   // Debounce timers — prevent a burst of WS events from flooding HTTP requests
   let _codesDebounce = null;
@@ -73,9 +75,13 @@
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${protocol}://${location.host}/ws/admin?token=${encodeURIComponent(token)}`);
     adminWs = ws;
+    wsStatus = 'connecting';
+    wsStatusText = 'Connecting live updates...';
 
     ws.addEventListener('open', () => {
       _reconnectDelay = 2000; // reset backoff on successful connect
+      wsStatus = 'connected';
+      wsStatusText = '';
     });
 
     ws.addEventListener('message', (ev) => {
@@ -90,11 +96,15 @@
     });
 
     ws.addEventListener('error', () => {
-      // Suppress unhandled error — close fires immediately after and handles reconnect
+      if (adminWs !== ws) return;
+      wsStatus = 'reconnecting';
+      wsStatusText = 'Live updates interrupted. Reconnecting...';
     });
 
     ws.addEventListener('close', () => {
       if (adminWs !== ws) return; // superseded
+      wsStatus = 'reconnecting';
+      wsStatusText = 'Live updates interrupted. Reconnecting...';
       adminWsReconnectTimer = setTimeout(connectAdminWS, _reconnectDelay);
       // Exponential backoff, cap at 30 s
       _reconnectDelay = Math.min(_reconnectDelay * 2, 30_000);
@@ -311,6 +321,10 @@
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
+
+    {#if wsStatus !== 'connected'}
+      <p class="ws-status">{wsStatusText}</p>
+    {/if}
 
     <div class="admin-body">
       {#if activeTab === 'codes'}
@@ -595,6 +609,18 @@
     gap: 1.25rem;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+
+  .ws-status {
+    margin: 0 0 0.7rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid rgba(196, 153, 106, 0.28);
+    border-radius: 0.62rem;
+    background: rgba(196, 153, 106, 0.08);
+    color: #f3d5b2;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.05em;
   }
   .admin-body::-webkit-scrollbar { width: 4px; }
   .admin-body::-webkit-scrollbar-track { background: transparent; }

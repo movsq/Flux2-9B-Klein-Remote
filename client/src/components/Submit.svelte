@@ -13,6 +13,7 @@
 
   let codeDepleted = $derived(codeUsesRemaining !== null && codeUsesRemaining === 0);
   let userDepleted = $derived(userUsesRemaining !== null && userUsesRemaining === 0);
+  let formLocked = $derived(!wsConnected);
 
   // Queue-derived state
   // queue now contains only this user's own jobs (server only sends owner detail).
@@ -214,6 +215,16 @@
   $effect(() => {
     onRegisterInputSetter(applyPreviewInput);
     return () => onRegisterInputSetter(null);
+  });
+
+  $effect(() => {
+    if (!formLocked) return;
+    configOpen = false;
+    seedModeOpen = false;
+    samplerOpen = false;
+    loraOpen = false;
+    quantizationOpen = false;
+    clipModelOpen = false;
   });
 
   function handleFileChange1(e) {
@@ -703,10 +714,10 @@
                 {/if}
               </div>
             {/if}
-            <input type="file" accept="image/*" onchange={handleFileChange1} class="hidden-input" />
+            <input type="file" accept="image/*" onchange={handleFileChange1} class="hidden-input" disabled={formLocked} />
           </label>
           {#if imageFile1}
-            <button type="button" class="btn-clear" onclick={clearImage1}>&times; Remove</button>
+            <button type="button" class="btn-clear" onclick={clearImage1} disabled={formLocked}>&times; Remove</button>
           {/if}
         </div>
 
@@ -746,17 +757,17 @@
                 {/if}
               </div>
             {/if}
-            <input type="file" accept="image/*" onchange={handleFileChange2} class="hidden-input" />
+            <input type="file" accept="image/*" onchange={handleFileChange2} class="hidden-input" disabled={formLocked} />
           </label>
           {#if imageFile2}
-            <button type="button" class="btn-clear" onclick={clearImage2}>&times; Remove</button>
+            <button type="button" class="btn-clear" onclick={clearImage2} disabled={formLocked}>&times; Remove</button>
           {/if}
         </div>
       </div>
 
       {#if imageFile1 && imageFile2}
         <div class="swap-row">
-          <button type="button" class="btn-swap" onclick={swapImages}>
+          <button type="button" class="btn-swap" onclick={swapImages} disabled={formLocked}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 4h9M1 4l2.5-2.5M1 4l2.5 2.5M13 10H4M13 10l-2.5-2.5M13 10l-2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             SWAP
           </button>
@@ -771,13 +782,14 @@
           placeholder="Describe your image..."
           bind:value={prompt}
           oninput={() => { if (error) error = ''; }}
+          disabled={formLocked}
           rows="7"
           spellcheck="false"
         ></textarea>
       </div>
 
       <!-- Config pill row -->
-      <button type="button" class="config-row" onclick={() => configOpen = true}>
+      <button type="button" class="config-row" onclick={() => configOpen = true} disabled={formLocked}>
         <span class="config-row-left">
           <svg class="config-icon" width="13" height="13" viewBox="0 0 20 20" fill="none">
             <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
@@ -792,6 +804,10 @@
           </span>
         </span>
       </button>
+
+      {#if formLocked}
+        <p class="offline-hint">Session reconnecting. Inputs and Configure unlock automatically once connected.</p>
+      {/if}
 
       {#if error}
         <p class="error">{error}</p>
@@ -1434,6 +1450,14 @@
     letter-spacing: 0.03em;
   }
 
+  .offline-hint {
+    font-family: 'DM Mono', monospace;
+    color: #a8b5c4;
+    font-size: 0.71rem;
+    margin: 0;
+    letter-spacing: 0.04em;
+  }
+
   /* ── Config pill row ─────────────────────────────────────────────────── */
   .config-row {
     width: 100%;
@@ -1463,6 +1487,10 @@
     background-color: rgba(9, 9, 11, 0.7);
   }
   .config-row:active { transform: scale(0.99); filter: brightness(0.9); }
+  .config-row:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
   .config-row-left {
     display: flex;

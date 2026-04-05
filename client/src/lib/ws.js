@@ -17,6 +17,7 @@ export function createPhoneWS(token) {
   const listeners = {};
   let socket = null;
   let closed = false;
+  let terminalReason = null;
   let failedAttempts = 0;
   let pingTimer = null;
   let reconnectTimer = null;
@@ -38,7 +39,7 @@ export function createPhoneWS(token) {
   function setConnectionState(nextState) {
     if (connectionState === nextState) return;
     connectionState = nextState;
-    emit('connection_state', { state: connectionState, failedAttempts });
+    emit('connection_state', { state: connectionState, failedAttempts, reason: terminalReason });
   }
 
   function connect() {
@@ -71,6 +72,7 @@ export function createPhoneWS(token) {
       if (!authenticated) {
         if (msg.type === 'auth_ok') {
           authenticated = true;
+          terminalReason = null;
           failedAttempts = 0;
           setConnectionState('connected');
           emit('open', null);
@@ -84,9 +86,23 @@ export function createPhoneWS(token) {
         } else if (msg.type === 'auth_failed') {
           console.warn('[ws] Auth rejected by server:', msg.reason);
           closed = true; // don't reconnect on auth failure
-          setConnectionState('exhausted');
-          emit('reconnect_failed', { reason: msg.reason ?? 'auth_failed' });
+          terminalReason = msg.reason ?? 'auth_failed';
+          setConnectionState('auth_invalid');
+          emit('session_invalid', { reason: terminalReason });
           socket.close();
+        }
+        return;
+      }
+
+      if (msg.type === 'session_invalid') {
+        terminalReason = msg.reason ?? 'session_invalid';
+        closed = true;
+        setConnectionState('auth_invalid');
+        emit('session_invalid', { reason: terminalReason });
+        try {
+          socket.close(4003, 'Session invalid');
+        } catch {
+          // no-op
         }
         return;
       }
@@ -98,6 +114,15 @@ export function createPhoneWS(token) {
       clearInterval(pingTimer);
       pingTimer = null;
       emit('close', event);
+
+      if (!closed && event.code === 4003) {
+        closed = true;
+        terminalReason = terminalReason ?? 'session_invalid';
+        setConnectionState('auth_invalid');
+        emit('session_invalid', { reason: terminalReason });
+        return;
+      }
+
       if (closed) return;
       failedAttempts += 1;
       if (failedAttempts >= MAX_RETRIES) {
