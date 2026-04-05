@@ -176,6 +176,21 @@ Flux2-9B-Klein-Remote/
 
 ---
 
+## Terms of Service
+
+Google-authenticated users must accept the Terms of Service before submitting jobs. The ToS modal is shown on first login and re-shown if a user attempts to generate without having accepted. Acceptance is recorded server-side (`tos_accepted_at` in the `users` table).
+
+The terms operate under the following legal framework:
+
+| Topic | Instrument |
+|-------|-----------|
+| Contract formation | § 1724 et seq. of Act No. 89/2012 Coll. (Czech Civil Code) |
+| Data protection | Regulation (EU) 2016/679 (GDPR) supplemented by Act No. 110/2019 Coll. |
+| Prohibited content | Act No. 40/2009 Coll. (Czech Criminal Code), Regulation (EU) 2024/1689 (AI Act) |
+| Governing law | Czech Republic — disputes resolved by Czech courts |
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
