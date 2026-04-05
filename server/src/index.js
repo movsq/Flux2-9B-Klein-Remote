@@ -44,6 +44,9 @@ import {
   updateUserUses,
   atomicDecrementUserUses,
   updateTosAccepted,
+  recordCodeAuthFailure,
+  getRecentCodeAuthFailureCount,
+  pruneCodeAuthFailures,
 } from './db.js';
 import {
   createJob,
@@ -56,6 +59,8 @@ import {
   getUserJobCount,
   getTotalActiveJobCount,
   getQueueState,
+  getPublicQueueState,
+  getOwnerQueueState,
   deleteJob,
 } from './jobs.js';
 
@@ -126,22 +131,31 @@ function notifyUserSockets(userId, usesRemaining) {
 
 // ── Queue broadcast ──────────────────────────────────────────────────────────
 // All connected phone sockets (for queue_update broadcasts)
-const allPhoneSockets = new Map(); // Map<WebSocket, { userId: string|null }>
+const allPhoneSockets = new Map(); // Map<WebSocket, { userId: string|null, sessionId: string|null }>
 
-function registerPhoneSocket(ws, userId) {
-  allPhoneSockets.set(ws, { userId });
+function registerPhoneSocket(ws, userId, sessionId) {
+  allPhoneSockets.set(ws, { userId, sessionId });
 }
 
 function unregisterPhoneSocket(ws) {
   allPhoneSockets.delete(ws);
 }
 
-/** Broadcast queue_update to all connected phone sockets. */
+/** Broadcast queue_update to all connected phone sockets.
+ *  Non-owners receive only aggregate data (no job IDs).
+ *  The owner receives per-job detail for their own jobs.
+ */
 function broadcastQueueUpdate() {
+  const pub = getPublicQueueState();
   for (const [ws, meta] of allPhoneSockets) {
     if (ws.readyState !== 1) continue;
-    const state = getQueueState(meta.userId);
-    sendJson(ws, { type: 'queue_update', ...state, maxQueuePerUser: MAX_QUEUE_PER_USER });
+    if (meta.sessionId) {
+      // Send private detail (own jobs) merged with public summary
+      const own = getOwnerQueueState(meta.sessionId);
+      sendJson(ws, { type: 'queue_update', ...pub, ...own, maxQueuePerUser: MAX_QUEUE_PER_USER });
+    } else {
+      sendJson(ws, { type: 'queue_update', ...pub, maxQueuePerUser: MAX_QUEUE_PER_USER });
+    }
   }
 }
 
@@ -627,8 +641,17 @@ app.post('/auth/code', (req, res) => {
     return res.status(400).json({ error: 'code required' });
   }
 
+  // Global brute-force guard: if the system has seen ≥100 failures in the last
+  // 60 s across all IPs, stop accepting guesses entirely.
+  const CODE_BF_WINDOW_MS = 60_000;
+  const CODE_BF_MAX = 100;
+  if (getRecentCodeAuthFailureCount(CODE_BF_WINDOW_MS) >= CODE_BF_MAX) {
+    return res.status(429).json({ error: 'Too many failed attempts — try again later' });
+  }
+
   const row = validateInviteCode(code.trim().toUpperCase(), 'job_access');
   if (!row) {
+    recordCodeAuthFailure();
     return res.status(400).json({ error: 'Invalid or expired access code' });
   }
 
@@ -751,6 +774,9 @@ setInterval(() => {
   }
 }, 5 * 60_000);
 
+// Prune code_auth_failures older than 5 minutes every 5 minutes
+setInterval(() => pruneCodeAuthFailures(5 * 60_000), 5 * 60_000);
+
 function getUpgradeIp(req) {
   // When behind a reverse proxy, trust the first X-Forwarded-For hop.
   // Otherwise use the raw socket address (matches trust proxy conditional below).
@@ -803,25 +829,9 @@ server.on('upgrade', async (req, socket, head) => {
   }
 
   if (url.pathname === '/ws/phone') {
-    const token = url.searchParams.get('token');
-    const payload = verifyJwt(token);
-    if (!payload) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    // Code users can connect too
-    if (payload.type === 'code_user') {
-      wss.handleUpgrade(req, socket, head, (ws) => handlePhoneSocket(ws, payload));
-      return;
-    }
-    const user = getUserById(payload.userId);
-    if (!user || user.status !== 'active') {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(req, socket, head, (ws) => handlePhoneSocket(ws, payload));
+    // Auth is performed via the first WebSocket message (type: 'auth', token: '...'),
+    // NOT via a URL query parameter, so JWTs are never written to proxy access logs.
+    wss.handleUpgrade(req, socket, head, (ws) => handlePhoneSocket(ws));
     return;
   }
 
@@ -838,7 +848,7 @@ async function handlePcSocket(ws) {
   const authTimeout = setTimeout(() => {
     console.warn('[pc] Auth timed out.');
     ws.close(4001, 'Auth timeout');
-  }, 10_000);
+  }, 3_000);
 
   ws.once('message', async (raw) => {
     clearTimeout(authTimeout);
@@ -904,17 +914,14 @@ function handlePcMessage(raw) {
     const max   = Number(msg.max);
     if (!Number.isFinite(value) || !Number.isFinite(max) || value < 0 || max < 0) return;
     const job = getJob(msg.jobId);
-    // Broadcast value/max to all phone clients (drives the progress bar for everyone).
-    // node is internal ComfyUI telemetry — send it only to the job owner.
-    const broadcastPayload = { type: 'progress', jobId: msg.jobId, value, max };
+    // Owner socket gets full detail (jobId + node) to drive its specific progress bar.
+    // All other sockets receive only value/max — enough to show a generic activity
+    // indicator without exposing the foreign job identifier.
+    const ownerPayload  = { type: 'progress', jobId: msg.jobId, value, max, node: msg.node ?? null };
+    const publicPayload = { type: 'progress', value, max };
     for (const [ws] of allPhoneSockets) {
       if (ws.readyState !== 1) continue;
-      if (ws === job?.phoneWs) {
-        // Job owner gets the full payload including node
-        sendJson(ws, { ...broadcastPayload, node: msg.node ?? null });
-      } else {
-        sendJson(ws, broadcastPayload);
-      }
+      sendJson(ws, ws === job?.phoneWs ? ownerPayload : publicPayload);
     }
     return;
   }
@@ -967,18 +974,82 @@ function handlePcMessage(raw) {
 }
 
 // ── Phone socket handler ──────────────────────────────────────────────────────
-function handlePhoneSocket(ws, jwtPayload) {
-  console.log(`[phone] Connected (${jwtPayload.type === 'code_user' ? 'code' : 'google'}).`);
+function handlePhoneSocket(ws) {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  // Derive a stable userId for queue tracking
+  // Require { type: 'auth', token } as the first message within 2 s.
+  // This keeps JWTs out of URL query strings (and therefore out of proxy logs).
+  const PHONE_AUTH_TIMEOUT_MS = 2_000;
+  const authTimeout = setTimeout(() => {
+    ws.close(4001, 'Auth timeout');
+  }, PHONE_AUTH_TIMEOUT_MS);
+
+  ws.once('message', (raw) => {
+    clearTimeout(authTimeout);
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch {
+      ws.close(4002, 'Invalid auth message');
+      return;
+    }
+    if (msg.type !== 'auth' || typeof msg.token !== 'string') {
+      ws.close(4002, 'Expected auth message');
+      return;
+    }
+
+    const payload = verifyJwt(msg.token);
+    if (!payload) {
+      sendJson(ws, { type: 'auth_failed', reason: 'invalid_token' });
+      ws.close(4003, 'Invalid token');
+      return;
+    }
+
+    if (payload.type === 'code_user') {
+      // Re-check DB state (mirrors requireActiveOrCode behaviour)
+      const code = findInviteCodeById(payload.codeId);
+      if (!code) {
+        sendJson(ws, { type: 'auth_failed', reason: 'code_not_found' });
+        ws.close(4003, 'Access code not found');
+        return;
+      }
+      if (code.expires_at !== null && Date.now() > code.expires_at) {
+        sendJson(ws, { type: 'auth_failed', reason: 'code_expired' });
+        ws.close(4003, 'Access code expired');
+        return;
+      }
+      if (code.uses_remaining !== null && code.uses_remaining <= 0) {
+        sendJson(ws, { type: 'auth_failed', reason: 'code_exhausted' });
+        ws.close(4003, 'Access code exhausted');
+        return;
+      }
+    } else {
+      const user = getUserById(payload.userId);
+      if (!user || user.status !== 'active') {
+        sendJson(ws, { type: 'auth_failed', reason: 'account_not_active' });
+        ws.close(4003, 'Account not active');
+        return;
+      }
+    }
+
+    sendJson(ws, { type: 'auth_ok' });
+    handlePhoneSocketAuthenticated(ws, payload);
+  });
+}
+
+function handlePhoneSocketAuthenticated(ws, jwtPayload) {
+  console.log(`[phone] Connected (${jwtPayload.type === 'code_user' ? 'code' : 'google'}).`);
+
+  // Stable userId for quota accounting (shared per code)
   const queueUserId = jwtPayload.type === 'code_user'
     ? `code:${jwtPayload.codeId}`
     : `user:${jwtPayload.userId}`;
 
+  // Per-connection session ID: used to scope cancel authorization so one
+  // code-user cannot cancel another code-user's job sharing the same codeId.
+  const wsSessionId = uuidv4();
+
   // Register in all tracking maps
-  registerPhoneSocket(ws, queueUserId);
+  registerPhoneSocket(ws, queueUserId, wsSessionId);
 
   if (jwtPayload.type === 'code_user') {
     registerCodeSocket(jwtPayload.codeId, ws);
@@ -993,8 +1064,9 @@ function handlePhoneSocket(ws, jwtPayload) {
   }
 
   // Send initial queue state
-  const initialState = getQueueState(queueUserId);
-  sendJson(ws, { type: 'queue_update', ...initialState, maxQueuePerUser: MAX_QUEUE_PER_USER });
+  const pub = getPublicQueueState();
+  const own = getOwnerQueueState(wsSessionId);
+  sendJson(ws, { type: 'queue_update', ...pub, ...own, maxQueuePerUser: MAX_QUEUE_PER_USER });
 
   // ── Periodic re-validation: close socket if user is no longer active ────────
   const WS_REVALIDATE_MS = 5 * 60_000; // 5 minutes
@@ -1045,12 +1117,14 @@ function handlePhoneSocket(ws, jwtPayload) {
         return;
       }
       submitTimestamps.push(now);
-      handleJobSubmit(ws, msg, jwtPayload, queueUserId);
+      handleJobSubmit(ws, msg, jwtPayload, queueUserId, wsSessionId);
     } else if (msg.type === 'cancel') {
       // Validate jobId length to prevent oversized strings probing internal state
       if (typeof msg.jobId === 'string' && msg.jobId && msg.jobId.length <= 64) {
         const job = getJob(msg.jobId);
-        if (job && job.userId === queueUserId) {
+        // Authorize by per-WS session ID, not by shared queueUserId, to prevent
+        // one code-user from cancelling another user's job on the same code.
+        if (job && job.ownerSessionId === wsSessionId) {
           const wasProcessing = job.status === 'processing';
           if (wasProcessing) {
             updateJobStatus(msg.jobId, 'cancelled');
@@ -1085,7 +1159,7 @@ function handlePhoneSocket(ws, jwtPayload) {
   });
 }
 
-function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null) {
+function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null, wsSessionId = null) {
   if (!pcSocket || pcSocket.readyState !== 1) {
     sendJson(phoneWs, { type: 'no_pc' });
     return;
@@ -1179,7 +1253,7 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null) {
   }
 
   const jobId = uuidv4();
-  createJob(jobId, phoneWs, queueUserId, msg.payload);
+  createJob(jobId, phoneWs, queueUserId, wsSessionId, msg.payload);
   sendJson(phoneWs, { type: 'queued', jobId });
   console.log(`[queue] Job ${jobId} added to queue.`);
 
