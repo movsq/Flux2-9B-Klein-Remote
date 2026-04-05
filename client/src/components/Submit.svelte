@@ -330,19 +330,29 @@
       const capturedPreview1 = imagePreviewUrl1;
       const capturedPreview2 = imagePreviewUrl2;
 
-      // Listen for the queued response to capture jobId
+      // Listen for the queued response to capture jobId.
+      // Also register sibling listeners for error/no_pc so the one-shot offQueued
+      // handler is always cleaned up, even when the server rejects the submit.
+      let offError, offNoPc;
+      function cleanup() {
+        if (offQueued) { offQueued(); offQueued = null; }
+        if (offError)  { offError();  offError  = null; }
+        if (offNoPc)   { offNoPc();   offNoPc   = null; }
+      }
       offQueued = ws.on('queued', ({ jobId }) => {
-        offQueued();
+        cleanup();
         onJobSubmitted({ aesKey, jobId, promptText: capturedPromptText, preview1: capturedPreview1, preview2: capturedPreview2 });
         // Advance seed for next submission
         if (seedMode === 'randomize') seed = Math.floor(Math.random() * 2 ** 32);
         else if (seedMode === 'increment') seed = seed + 1;
         else if (seedMode === 'decrement') seed = seed - 1;
       });
+      offError = ws.on('error', cleanup);
+      offNoPc  = ws.on('no_pc', cleanup);
 
       const sent = ws.send({ type: 'submit', payload });
       if (!sent) {
-        offQueued();
+        cleanup();
         throw new Error('WebSocket is not connected');
       }
       // Return to idle immediately so user can queue more jobs

@@ -331,21 +331,25 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 /** POST /codes — generate a new invite code */
 app.post('/codes', requireAdmin, (req, res) => {
-  const { type = 'registration', usesRemaining = 1, expiresInHours = null } = req.body ?? {};
+  const { type = 'registration', usesRemaining: usesRemainingRaw = 1, expiresInHours: expiresInHoursRaw = null } = req.body ?? {};
   if (!['registration', 'job_access'].includes(type)) {
     return res.status(400).json({ error: 'Invalid type' });
   }
-  if (usesRemaining !== null && usesRemaining !== undefined) {
-    const n = parseInt(usesRemaining, 10);
+  let usesRemaining = null;
+  if (usesRemainingRaw !== null && usesRemainingRaw !== undefined) {
+    const n = parseInt(usesRemainingRaw, 10);
     if (isNaN(n) || n < 1 || n > 999_999) {
       return res.status(400).json({ error: 'usesRemaining must be a positive integer ≤ 999999 or null (unlimited)' });
     }
+    usesRemaining = n;
   }
-  if (expiresInHours !== null && expiresInHours !== undefined) {
-    const n = parseFloat(expiresInHours);
+  let expiresInHours = null;
+  if (expiresInHoursRaw !== null && expiresInHoursRaw !== undefined) {
+    const n = parseFloat(expiresInHoursRaw);
     if (isNaN(n) || n <= 0 || n > 87_600) { // max 10 years
-      return res.status(400).json({ error: 'expiresInHours must be between 0 and 87600' });
+      return res.status(400).json({ error: 'expiresInHours must be a positive number and at most 87600' });
     }
+    expiresInHours = n;
   }
 
   // Generate KLEIN-XXXX-XXXX format
@@ -357,13 +361,13 @@ app.post('/codes', requireAdmin, (req, res) => {
     if (i === 3) code += '-';
   }
 
-  const expiresAt = expiresInHours ? Date.now() + expiresInHours * 3600_000 : null;
+  const expiresAt = expiresInHours !== null ? Date.now() + expiresInHours * 3600_000 : null;
 
   createInviteCode({
     code,
     type,
     createdBy: req.user.userId,
-    usesRemaining: usesRemaining ?? null,
+    usesRemaining,
     expiresAt,
   });
 
@@ -913,7 +917,9 @@ function handlePcMessage(raw) {
     const value = Number(msg.value);
     const max   = Number(msg.max);
     if (!Number.isFinite(value) || !Number.isFinite(max) || value < 0 || max < 0) return;
+    if (typeof msg.jobId !== 'string' || !msg.jobId) return;
     const job = getJob(msg.jobId);
+    if (!job || job.status !== 'processing') return;
     // Owner socket gets full detail (jobId + node) to drive its specific progress bar.
     // All other sockets receive only value/max — enough to show a generic activity
     // indicator without exposing the foreign job identifier.

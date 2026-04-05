@@ -151,8 +151,8 @@ export function getOwnerQueueState(ownerSessionId) {
     if (!job) continue;
     if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') continue;
     position++;
-    if (job.status === 'processing') activeJobId = job.id;
     if (job.ownerSessionId === ownerSessionId) {
+      if (job.status === 'processing') activeJobId = job.id;
       queue.push({
         jobId: job.id,
         position,
