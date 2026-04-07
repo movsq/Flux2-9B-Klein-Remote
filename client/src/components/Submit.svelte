@@ -812,9 +812,9 @@
 
       <!-- Generate row -->
       <div class="generate-row">
-        <button type="submit" class="btn-generate" class:btn-queue-full={queueFull} disabled={!prompt.trim() || status === 'encrypting' || codeDepleted || userDepleted || queueFull || !wsConnected}>
+        <button type="submit" class="btn-generate" class:btn-queue-full={queueFull} class:btn-processing={status === 'encrypting'} disabled={!prompt.trim() || status === 'encrypting' || codeDepleted || userDepleted || queueFull || !wsConnected}>
           {#if status === 'encrypting'}
-            ENCRYPTING...
+            PROCESSING…
           {:else if !wsConnected}
             {wsInitializing ? 'CONNECTING...' : 'RECONNECTING...'}
           {:else if queueFull}
@@ -1421,6 +1421,27 @@
   .btn-generate:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-generate:disabled { opacity: 0.7; cursor: not-allowed; }
   .btn-generate.btn-queue-full:disabled { opacity: 0.42; }
+  .btn-generate.btn-processing {
+    background: #3a3f47;
+    color: #8b96a6;
+    cursor: not-allowed;
+    opacity: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-generate.btn-processing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.07) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: btn-sweep 1.6s linear infinite;
+    border-radius: inherit;
+  }
+  @keyframes btn-sweep {
+    from { background-position: 200% center; }
+    to   { background-position: -200% center; }
+  }
 
   /* ── Error / Code status ─────────────────────────────────────────────── */
   .error {

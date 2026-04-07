@@ -164,49 +164,80 @@
       <p class="status">DECRYPTING…</p>
     {:else if decryptError}
       <p class="error">{decryptError}</p>
-      <button onclick={retryDecrypt} class="btn btn-ghost">Retry</button>
+      <button onclick={retryDecrypt} class="overlay-pill">Retry</button>
     {:else if imageUrl}
-      <img src={imageUrl} alt="Generated result" class="result-image" />
-      <div class="actions">
-        <a href={imageUrl} download="result.png" class="btn btn-accent">Download</a>
-        {#if userType === 'google'}
-          {#if saved}
-            <!-- Save chosen: Discard is gone, show confirmation -->
-            <button class="btn btn-ghost" disabled>✓ Saved</button>
-          {:else if saving || savePending}
-            <!-- Save in progress / waiting for vault: hide Discard so user can't do both -->
-            <button class="btn btn-ghost save-pending" disabled>
-              {saving ? 'Saving…' : 'Unlock vault to save…'}
-            </button>
-          {:else}
-            <!-- Idle: show both options — user must pick one -->
-            <button onclick={handleSave} class="btn btn-ghost">Save</button>
-            <button onclick={onDone} class="btn btn-ghost btn-danger">Discard</button>
-          {/if}
-        {:else}
-          <!-- Code users have no vault: only Discard -->
-          <button onclick={onDone} class="btn btn-ghost btn-danger">Discard</button>
-        {/if}
-        <div class="use-input-wrap">
-          <button
-            class="btn btn-ghost btn-use-input"
-            onclick={() => { useInputOpen = !useInputOpen; inputAssignError = ''; }}
-            disabled={!imageBytes || assigningInput}
-            aria-haspopup="true"
-            aria-expanded={useInputOpen}
-          >
-            {assigningInput ? 'Assigning…' : 'Use as Input'}
-          </button>
-          {#if useInputOpen}
-            <div class="use-input-picker" role="menu" aria-label="Select input slot">
-              <button class="picker-btn" role="menuitem" onclick={() => assignToInput(1)} disabled={assigningInput}>Input 1</button>
-              <button class="picker-btn" role="menuitem" onclick={() => assignToInput(2)} disabled={assigningInput}>Input 2</button>
+      <div class="image-wrap">
+        <!-- svelte-ignore a11y_interactive_supports_focus -->
+        <img src={imageUrl} alt="Generated result" class="result-image" />
+
+        <!-- Overlay controls -->
+        <div class="img-overlay">
+          <!-- Top-right: Download -->
+          <a href={imageUrl} download="result.png" class="overlay-btn overlay-download" aria-label="Download image">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </a>
+
+          <!-- Bottom bar: actions -->
+          <div class="overlay-bar">
+            {#if userType === 'google'}
+              {#if saved}
+                <span class="overlay-pill overlay-pill-saved">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Saved
+                </span>
+              {:else if saving || savePending}
+                <span class="overlay-pill overlay-pill-pending">
+                  {saving ? 'Saving…' : 'Unlocking…'}
+                </span>
+              {:else}
+                <button class="overlay-pill overlay-pill-save" onclick={handleSave}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 9l2.5 2.5L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Save
+                </button>
+                <button class="overlay-pill overlay-pill-discard" onclick={onDone}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  Discard
+                </button>
+              {/if}
+            {:else}
+              <button class="overlay-pill overlay-pill-discard" onclick={onDone}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Discard
+              </button>
+            {/if}
+
+            <!-- Use as Input -->
+            <div class="use-input-wrap">
+              <button
+                class="overlay-pill overlay-pill-use"
+                onclick={() => { useInputOpen = !useInputOpen; inputAssignError = ''; }}
+                disabled={!imageBytes || assigningInput}
+                aria-haspopup="true"
+                aria-expanded={useInputOpen}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M7 8h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                {assigningInput ? 'Assigning…' : 'Use as Input'}
+                <span class="overlay-chevron" class:open={useInputOpen}>
+                  <svg width="9" height="9" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+              </button>
+              {#if useInputOpen}
+                <div class="use-input-picker" role="menu" aria-label="Select input slot">
+                  <button class="picker-btn" role="menuitem" onclick={() => assignToInput(1)} disabled={assigningInput}>Input 1</button>
+                  <button class="picker-btn" role="menuitem" onclick={() => assignToInput(2)} disabled={assigningInput}>Input 2</button>
+                </div>
+              {/if}
             </div>
-          {/if}
+
+            <!-- Close -->
+            <button class="overlay-pill overlay-pill-close" onclick={saved ? onDone : onClose}>
+              Close
+            </button>
+          </div>
         </div>
-        <!-- After a successful save the result is in the vault — close permanently
-             (onDone) so it doesn't linger in the 2-min dismissed shelf. -->
-        <button onclick={saved ? onDone : onClose} class="btn btn-ghost btn-close-action">Close</button>
       </div>
       {#if inputAssignError}
         <p class="save-error">{inputAssignError}</p>
@@ -251,7 +282,7 @@
   }
 
   .backdrop.ghost .close-btn,
-  .backdrop.ghost .actions,
+  .backdrop.ghost .img-overlay,
   .backdrop.ghost .modal-label {
     opacity: 0;
   }
@@ -271,18 +302,18 @@
   .modal {
     position: relative;
     width: 100%;
-    max-width: 480px;
+    max-width: 520px;
     max-height: calc(100dvh - 2rem);
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(12, 12, 16, 0.88);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 1.25rem 1.25rem 1rem 1rem;
     user-select: none;
     -webkit-user-select: none;
-    padding: 1.25rem;
+    padding: 1rem;
     backdrop-filter: blur(24px);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.65rem;
     overflow: hidden;
     animation: slide-up 0.26s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -290,8 +321,8 @@
   @media (min-width: 480px) {
     .modal {
       border-radius: 1.25rem;
-      padding: 1.75rem;
-      gap: 1rem;
+      padding: 1.25rem;
+      gap: 0.75rem;
       max-height: calc(100dvh - 3rem);
     }
   }
@@ -356,125 +387,225 @@
 
   .result-image {
     width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 0.875rem;
+    /* Allow iOS native save-photo long-press */
+    -webkit-touch-callout: default;
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: auto;
+  }
+
+  /* ── Image wrapper with overlay ────────────────────────────────────── */
+  .image-wrap {
+    position: relative;
     flex: 1;
     min-height: 0;
-    object-fit: contain;
     border-radius: 0.875rem;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    display: block;
+    overflow: hidden;
+    /* Override .modal user-select so the iOS save-photo long-press works on the image */
+    user-select: auto;
+    -webkit-user-select: auto;
     -webkit-touch-callout: default;
+  }
+
+  .img-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-radius: 0.875rem;
+  }
+
+  /* Download button — top right corner */
+  .overlay-download {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    pointer-events: auto;
+  }
+
+  /* Bottom action bar */
+  .overlay-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 2.5rem 0.6rem 0.6rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 60%, transparent 100%);
+    border-radius: 0 0 0.875rem 0.875rem;
+    pointer-events: auto;
+  }
+
+  /* Shared pill style */
+  .overlay-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.42rem 0.75rem;
+    border-radius: 3rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(9, 9, 11, 0.72);
+    color: #c2ccd5;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, color 0.15s;
+    text-decoration: none;
+    white-space: nowrap;
+    -webkit-touch-callout: none;
     user-select: none;
     -webkit-user-select: none;
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    flex-shrink: 0;
+  .overlay-pill:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #eef3f8;
   }
 
-  .btn-close-action {
-    margin-left: auto;
-    flex: 0 0 auto;
+  .overlay-pill:active {
+    transform: scale(0.93);
   }
 
-  .btn {
-    flex: 1;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 3rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
+  .overlay-pill:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .overlay-download {
+    padding: 0.5rem;
+    border-radius: 50%;
+    background: rgba(9, 9, 11, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #c2ccd5;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
+    transition: background 0.15s, transform 0.1s, color 0.15s;
+    pointer-events: auto;
+    text-decoration: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .btn:active {
-    transform: scale(0.95);
-    filter: brightness(0.85);
+  .overlay-download:hover {
+    background: rgba(82, 116, 144, 0.55);
+    color: #eef3f8;
   }
 
-  .btn-accent {
-    background: #527490;
-    color: #09090b;
+  .overlay-download:active { transform: scale(0.88); }
+
+  .overlay-pill-save {
+    background: rgba(82, 116, 144, 0.65);
+    border-color: rgba(82, 116, 144, 0.55);
+    color: #d8e8f3;
   }
 
-  .btn-accent:hover {
-    background: #7d9db6;
+  .overlay-pill-save:hover {
+    background: rgba(82, 116, 144, 0.88);
+    border-color: rgba(125, 157, 182, 0.7);
+    color: #eef3f8;
   }
 
-  .btn-ghost {
-    background: rgba(255, 255, 255, 0.06);
-    color: #c2ccd5;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #e4e4e7;
-  }
-
-  .btn-ghost.btn-danger {
-    color: #c47070;
-    border-color: rgba(196, 112, 112, 0.4);
-  }
-
-  .btn-ghost.btn-danger:hover {
-    background: rgba(196, 112, 112, 0.12);
-    color: #e07070;
-    border-color: rgba(196, 112, 112, 0.65);
-  }
-
-  .btn-ghost.save-pending {
+  .overlay-pill-saved {
+    background: rgba(82, 116, 144, 0.22);
     border-color: rgba(82, 116, 144, 0.3);
-    color: #527490;
-    opacity: 0.75;
+    color: #7db6a0;
+    cursor: default;
   }
 
+  .overlay-pill-pending {
+    background: rgba(82, 116, 144, 0.18);
+    border-color: rgba(82, 116, 144, 0.22);
+    color: #527490;
+    opacity: 0.8;
+    cursor: default;
+  }
+
+  .overlay-pill-discard {
+    color: #c47070;
+    border-color: rgba(196, 112, 112, 0.35);
+  }
+
+  .overlay-pill-discard:hover {
+    background: rgba(196, 112, 112, 0.28);
+    border-color: rgba(196, 112, 112, 0.6);
+    color: #e07070;
+  }
+
+  .overlay-chevron {
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.7;
+    transition: transform 0.18s ease;
+  }
+
+  .overlay-chevron.open {
+    transform: rotate(180deg);
+  }
+
+  .overlay-pill-use {
+    position: relative;
+  }
+
+  .overlay-pill-close {
+    margin-left: auto;
+  }
+
+  /* ── Use-as-input picker ─────────────────────────────────────────────── */
   .use-input-wrap {
     position: relative;
-    flex: 1;
-    min-width: 140px;
-    display: flex;
-    justify-content: center;
-  }
-
-  .btn-use-input {
-    width: 100%;
+    flex: 0 0 auto;
   }
 
   .use-input-picker {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(100% + 0.45rem);
+    bottom: calc(100% + 0.4rem);
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
-    padding: 0.45rem;
+    gap: 0.35rem;
+    padding: 0.4rem;
     border-radius: 0.75rem;
-    background: rgba(9, 9, 11, 0.96);
-    border: 1px solid rgba(82, 116, 144, 0.35);
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+    background: rgba(9, 9, 11, 0.94);
+    border: 1px solid rgba(82, 116, 144, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 10;
+    min-width: 140px;
   }
 
   .picker-btn {
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.06);
     color: #d1dae3;
-    border-radius: 0.6rem;
+    border-radius: 0.5rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.66rem;
     letter-spacing: 0.08em;
-    padding: 0.5rem 0.2rem;
+    padding: 0.5rem 0.3rem;
     cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
   }
 
   .picker-btn:hover {
