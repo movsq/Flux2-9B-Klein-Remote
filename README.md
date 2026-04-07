@@ -88,6 +88,8 @@ Ready to install? → **[SETUP.md](SETUP.md)**
 | [docs/API.md](docs/API.md) | Full REST API and WebSocket protocol message reference |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | All environment variables with defaults and descriptions |
 | [docs/ADMIN.md](docs/ADMIN.md) | Admin panel tabs (Codes, Users), first-admin CLI |
+| [docs/PRIVACY.md](docs/PRIVACY.md) | Privacy chain, vault data model, deployer legal position |
+| [docs/TOS.md](docs/TOS.md) | Terms of Service and legal framework |
 | [ComfyUI-Workflow/README.md](ComfyUI-Workflow/README.md) | Required models, custom nodes, full node map |
 
 ---
