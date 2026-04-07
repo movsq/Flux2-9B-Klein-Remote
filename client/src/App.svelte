@@ -9,7 +9,7 @@
   import Gallery from './components/Gallery.svelte';
   import TermsModal from './components/TermsModal.svelte';
   import { createPhoneWS } from './lib/ws.js';
-  import { getVaultInfo } from './lib/api.js';
+  import { getVaultInfo, logoutToken } from './lib/api.js';
   import { onDestroy } from 'svelte';
 
   function randomSeed() {
@@ -469,6 +469,7 @@
     if (reason === 'token_expired') return 'Session expired while idle.';
     if (reason === 'code_expired') return 'Access code expired.';
     if (reason === 'code_exhausted') return 'Access code has no remaining uses.';
+    if (reason === 'no_uses_remaining') return 'No remaining uses on your account.';
     if (reason === 'account_suspended') return 'Account is no longer active.';
     if (reason === 'code_not_found') return 'Access code is no longer valid.';
     return 'Session expired. Please sign in again.';
@@ -487,6 +488,7 @@
   }
 
   function forceRelogin(reason) {
+    const oldToken = token;
     clearResultCards();
     ws?.close?.();
     ws = null;
@@ -510,6 +512,7 @@
     masterKey = null;
     pendingVaultAction = null;
     closeTabChannel();
+    if (oldToken) logoutToken(oldToken);
   }
 </script>
 

@@ -105,6 +105,19 @@ if (db.pragma('user_version', { simple: true }) < 3) {
   db.pragma('user_version = 3');
 }
 
+if (db.pragma('user_version', { simple: true }) < 5) {
+  // v5: JWT revocation list — short-lived blocklist for logged-out tokens
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS revoked_tokens (
+      jti        TEXT    PRIMARY KEY,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires
+      ON revoked_tokens(expires_at);
+  `);
+  db.pragma('user_version = 5');
+}
+
 // ── Prepared statements ───────────────────────────────────────────────────────
 
 // Users
@@ -233,6 +246,17 @@ const stmtGetAllUsers = db.prepare(
 
 const stmtGetUsersByStatus = db.prepare(
   'SELECT id, email, name, picture, status, is_admin, uses_remaining, tos_accepted_at, tos_version, created_at, updated_at FROM users WHERE status = ? ORDER BY created_at DESC',
+);
+
+// Revoked tokens (JWT blocklist)
+const stmtInsertRevokedToken = db.prepare(
+  'INSERT OR IGNORE INTO revoked_tokens (jti, expires_at) VALUES (?, ?)',
+);
+const stmtIsTokenRevoked = db.prepare(
+  'SELECT 1 FROM revoked_tokens WHERE jti = ?',
+);
+const stmtPruneRevokedTokens = db.prepare(
+  'DELETE FROM revoked_tokens WHERE expires_at < ?',
 );
 
 // Global code auth failure tracking (brute-force protection)
@@ -460,6 +484,20 @@ export function getRecentCodeAuthFailureCount(windowMs) {
  */
 export function pruneCodeAuthFailures(maxAgeMs) {
   return stmtPruneOldAuthFailures.run(Date.now() - maxAgeMs);
+}
+
+// Revoked tokens (JWT blocklist)
+
+export function insertRevokedToken(jti, expiresAt) {
+  return stmtInsertRevokedToken.run(jti, expiresAt);
+}
+
+export function isTokenRevoked(jti) {
+  return !!stmtIsTokenRevoked.get(jti);
+}
+
+export function pruneRevokedTokens() {
+  return stmtPruneRevokedTokens.run(Date.now());
 }
 
 export default db;

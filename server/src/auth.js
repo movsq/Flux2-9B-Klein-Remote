@@ -1,7 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
-import { timingSafeEqual } from 'crypto';
-import { getUserById, findInviteCodeById } from './db.js';
+import { timingSafeEqual, randomUUID } from 'crypto';
+import { getUserById, findInviteCodeById, isTokenRevoked } from './db.js';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -44,7 +44,7 @@ export async function verifyGoogleToken(idToken) {
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
 export function signJwt({ userId, googleSub, status, isAdmin, codeId, type }) {
-  const payload = {};
+  const payload = { jti: randomUUID() };
   if (userId != null) payload.userId = userId;
   if (googleSub) payload.googleSub = googleSub;
   if (status) payload.status = status;
@@ -60,7 +60,9 @@ export function signJwt({ userId, googleSub, status, isAdmin, codeId, type }) {
 
 export function verifyJwt(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.jti && isTokenRevoked(payload.jti)) return null;
+    return payload;
   } catch {
     return null;
   }

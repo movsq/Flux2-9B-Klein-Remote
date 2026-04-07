@@ -40,6 +40,19 @@ export async function getMe(token) {
 }
 
 /**
+ * Revoke the current JWT on the server so it cannot be reused.
+ * Best-effort — failures are silently ignored (the token still expires naturally).
+ */
+export async function logoutToken(token) {
+  try {
+    await fetch('/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch { /* best-effort */ }
+}
+
+/**
  * Fetch the PC's cached public key from the server.
  * Returns the base64-encoded SPKI string.
  */

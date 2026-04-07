@@ -47,6 +47,8 @@ import {
   recordCodeAuthFailure,
   getRecentCodeAuthFailureCount,
   pruneCodeAuthFailures,
+  insertRevokedToken,
+  pruneRevokedTokens,
 } from './db.js';
 import {
   createJob,
@@ -77,6 +79,11 @@ const MAX_TOTAL_QUEUE_DEPTH = parseInt(process.env.MAX_TOTAL_QUEUE_DEPTH ?? '50'
 // 100 MB gives ample headroom while blocking obviously over-sized blobs.
 const MAX_PAYLOAD_B64 = 100 * 1024 * 1024;
 const MAX_RESULTS_PER_USER = parseInt(process.env.MAX_RESULTS_PER_USER ?? '500', 10);
+
+// ── Per-user submit rate limiter (persists across reconnects) ─────────────────
+const WS_SUBMIT_WINDOW_MS = 60_000;
+const WS_SUBMIT_MAX = 10;
+const submitRateLimiter = new Map(); // Map<queueUserId, number[]>
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -209,6 +216,7 @@ function getSessionInvalidReason(jwtPayload, rawToken) {
 
   const user = getUserById(jwtPayload.userId);
   if (!user || user.status !== 'active') return 'account_suspended';
+  if (user.uses_remaining !== null && user.uses_remaining <= 0) return 'no_uses_remaining';
   return null;
 }
 
@@ -714,6 +722,19 @@ app.post('/auth/code', (req, res) => {
   res.json({ token, user: { type: 'code_user', codeId: row.id } });
 });
 
+/** POST /auth/logout — revoke the current JWT so it cannot be reused */
+app.post('/auth/logout', (req, res) => {
+  const header = req.headers['authorization'] ?? '';
+  const raw = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!raw) return res.status(401).json({ error: 'No token' });
+  const payload = verifyJwt(raw);
+  if (!payload) return res.status(401).json({ error: 'Invalid token' });
+  if (payload.jti && payload.exp) {
+    insertRevokedToken(payload.jti, payload.exp * 1000);
+  }
+  res.json({ ok: true });
+});
+
 // ── Admin user management ─────────────────────────────────────────────────────
 
 /** GET /admin/users — list users, optionally filter by status */
@@ -748,9 +769,12 @@ app.patch('/admin/users/:id', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Nothing to update' });
   }
 
-  // Cannot modify own account
+  // Self-edit: admins can only change their own usesRemaining
   if (id === req.user.userId) {
-    return res.status(400).json({ error: 'Cannot modify own account' });
+    if (status !== undefined) {
+      return res.status(400).json({ error: 'Cannot modify own status' });
+    }
+    // Allow usesRemaining self-edit to fall through
   }
 
   const target = getUserById(id);
@@ -1183,10 +1207,7 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload, rawToken) {
     }
   }, WS_REVALIDATE_MS);
 
-  // ── Per-socket submit rate limiter (max 10 submits / 60 s sliding window) ────
-  const WS_SUBMIT_WINDOW_MS = 60_000;
-  const WS_SUBMIT_MAX = 10;
-  const submitTimestamps = [];
+  // ── Submit rate limiting is handled per-user via module-level submitRateLimiter ──
 
   ws.on('message', (raw) => {
     let msg;
@@ -1210,14 +1231,16 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload, rawToken) {
         invalidatePhoneSession(ws, reason);
         return;
       }
-      // Rate limit submits
+      // Rate limit submits (per-user, persists across reconnects)
       const now = Date.now();
-      while (submitTimestamps.length && submitTimestamps[0] <= now - WS_SUBMIT_WINDOW_MS) submitTimestamps.shift();
-      if (submitTimestamps.length >= WS_SUBMIT_MAX) {
+      let timestamps = submitRateLimiter.get(queueUserId);
+      if (!timestamps) { timestamps = []; submitRateLimiter.set(queueUserId, timestamps); }
+      while (timestamps.length && timestamps[0] <= now - WS_SUBMIT_WINDOW_MS) timestamps.shift();
+      if (timestamps.length >= WS_SUBMIT_MAX) {
         sendJson(ws, { type: 'error', message: 'Rate limit exceeded — try again later' });
         return;
       }
-      submitTimestamps.push(now);
+      timestamps.push(now);
       handleJobSubmit(ws, msg, jwtPayload, queueUserId, wsSessionId);
     } else if (msg.type === 'cancel') {
       const reason = getSessionInvalidReason(jwtPayload, rawToken);
@@ -1265,7 +1288,13 @@ function handlePhoneSocketAuthenticated(ws, jwtPayload, rawToken) {
   });
 }
 
-function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null, wsSessionId = null) {
+function handleJobSubmit(phoneWs, msg, jwtPayload, queueUserId, wsSessionId) {
+  if (!jwtPayload || !queueUserId) {
+    console.error('[BUG] handleJobSubmit called without required params');
+    sendJson(phoneWs, { type: 'error', message: 'Internal error' });
+    return;
+  }
+
   if (!pcSocket || pcSocket.readyState !== 1) {
     sendJson(phoneWs, { type: 'no_pc' });
     return;
@@ -1344,6 +1373,10 @@ function handleJobSubmit(phoneWs, msg, jwtPayload = null, queueUserId = null, ws
       sendJson(phoneWs, { type: 'error', message: 'Access code not found' });
       return;
     }
+    if (codeRow.expires_at !== null && Date.now() > codeRow.expires_at) {
+      sendJson(phoneWs, { type: 'error', message: 'Access code expired' });
+      return;
+    }
     if (codeRow.uses_remaining !== null) {
       const result = atomicDecrementCodeUses(codeRow.id);
       if (result.changes === 0) {
@@ -1399,6 +1432,10 @@ initAuth();
 
 // Prune stale jobs every 10 minutes
 setInterval(() => pruneOldJobs(30 * 60 * 1000), 10 * 60 * 1000);
+
+// Prune expired revoked-token entries every 60 minutes (and once at startup)
+pruneRevokedTokens();
+setInterval(() => pruneRevokedTokens(), 60 * 60 * 1000);
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 server.listen(PORT, () => {
