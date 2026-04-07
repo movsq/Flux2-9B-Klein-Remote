@@ -13,7 +13,7 @@ Run Flux 2 on your own PC's GPU and use it from any browser — phone, tablet, l
     <td align="center"><b>Generate</b><br><img src="docs/screenshots/submit.png" width="220"></td>
   </tr>
   <tr>
-    <td align="center"><b>Queue — Waiting</b><br><img src="docs/screenshots/queue-waiting.png" width="220"></td>
+    <td align="center"><b>Queue — Waiting</b><br></td>
     <td align="center"><b>Queue — Current</b><br><img src="docs/screenshots/queue-current.png" width="220"></td>
     <td align="center"><b>Configuration</b><br><img src="docs/screenshots/configuration.png" width="220"></td>
   </tr>

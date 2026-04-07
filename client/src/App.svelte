@@ -54,6 +54,7 @@
   let showVaultUnlock = $state(false);
   let showVaultSettings = $state(false);
   let pendingVaultAction = $state(null); // callback after unlock
+  let _pendingUnlockCancelCb = null;   // non-reactive, called if unlock dismissed without unlocking
 
   // Transition animation state
   let loginExiting = $state(false);
@@ -297,12 +298,14 @@
   function handleVaultSetupComplete(key) {
     masterKey = key;
     showVaultSetup = false;
+    _pendingUnlockCancelCb = null;
     checkVault(); // refresh info
   }
 
   function handleVaultUnlocked(key) {
     masterKey = key;
     showVaultUnlock = false;
+    _pendingUnlockCancelCb = null;
     if (pendingVaultAction) {
       pendingVaultAction();
       pendingVaultAction = null;
@@ -313,10 +316,12 @@
     masterKey = null;
     showVaultUnlock = false;
     pendingVaultAction = null;
+    _pendingUnlockCancelCb = null;
     checkVault();
   }
 
-  async function requestVaultUnlock() {
+  async function requestVaultUnlock(onCancelled = null) {
+    _pendingUnlockCancelCb = onCancelled;
     // If vaultInfo hasn't loaded yet, fetch it now before deciding which panel to show
     if (vaultInfo === null) {
       try {
@@ -511,6 +516,7 @@
     vaultInfo = null;
     masterKey = null;
     pendingVaultAction = null;
+    _pendingUnlockCancelCb = null;
     closeTabChannel();
     if (oldToken) logoutToken(oldToken);
   }
@@ -589,7 +595,7 @@
       {token}
       userEmail={user?.email ?? ''}
       onComplete={handleVaultSetupComplete}
-      onSkip={() => showVaultSetup = false}
+      onSkip={() => { showVaultSetup = false; const cb = _pendingUnlockCancelCb; _pendingUnlockCancelCb = null; cb?.(); }}
     />
   {/if}
 
@@ -598,8 +604,8 @@
       {token}
       {vaultInfo}
       onUnlocked={handleVaultUnlocked}
-      onCancel={() => { showVaultUnlock = false; pendingVaultAction = null; }}
-      onOpenSettings={() => { showVaultUnlock = false; pendingVaultAction = null; showVaultSettings = true; }}
+      onCancel={() => { showVaultUnlock = false; pendingVaultAction = null; const cb = _pendingUnlockCancelCb; _pendingUnlockCancelCb = null; cb?.(); }}
+      onOpenSettings={() => { showVaultUnlock = false; pendingVaultAction = null; const cb = _pendingUnlockCancelCb; _pendingUnlockCancelCb = null; cb?.(); showVaultSettings = true; }}
     />
   {/if}
 
@@ -702,19 +708,31 @@
   .input-toast {
     position: fixed;
     left: 50%;
-    bottom: 1.2rem;
+    bottom: 1.5rem;
     transform: translateX(-50%);
-    padding: 0.58rem 0.95rem;
+    padding: 0.6rem 1.15rem;
     border-radius: 999px;
-    border: 1px solid rgba(82, 116, 144, 0.45);
-    background: rgba(10, 14, 20, 0.92);
-    color: #dbe4eb;
+    border: 1px solid rgba(125, 168, 196, 0.28);
+    background: rgba(12, 18, 28, 0.52);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    color: #c8dde9;
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     z-index: 220;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.45),
+      0 1px 0 rgba(255, 255, 255, 0.1) inset,
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset;
     pointer-events: none;
+    white-space: nowrap;
+    animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
 

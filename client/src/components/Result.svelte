@@ -111,7 +111,7 @@
   async function handleSave() {
     if (!masterKey) {
       savePending = true;
-      if (onRequestVaultUnlock) onRequestVaultUnlock();
+      if (onRequestVaultUnlock) onRequestVaultUnlock(() => { savePending = false; });
       return;
     }
     savePending = false;

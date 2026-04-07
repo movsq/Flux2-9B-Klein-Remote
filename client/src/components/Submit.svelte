@@ -991,23 +991,18 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background-color: rgba(9, 9, 11, 0.84);
-    background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
-    background-size: 48px 48px;
-    background-attachment: fixed;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(9, 9, 11, 0.92);
     color: #8b96a6;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.12s ease, filter 0.12s ease, background-color 0.2s, color 0.2s;
+    transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, border-color 0.2s, color 0.2s;
     flex-shrink: 0;
   }
 
-  .btn-admin:hover { background-color: rgba(9, 9, 11, 0.5); color: #527490; }
+  .btn-admin:hover { background: rgba(18, 24, 36, 0.96); border-color: rgba(82, 116, 144, 0.4); color: #527490; }
   .btn-admin:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .form-title {
@@ -1074,7 +1069,7 @@
     border: 1px dashed rgba(255, 255, 255, 0.12);
     border-radius: 0.75rem;
     height: 180px;
-    background-color: rgba(9, 9, 11, 0.84);
+    background-color: rgba(9, 9, 11, 0.92);
     background-image:
       linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
       linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
@@ -1194,7 +1189,7 @@
     padding: 0.65rem 0.875rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 0.75rem;
-    background-color: rgba(9, 9, 11, 0.84);
+    background-color: rgba(9, 9, 11, 0.92);
     background-image:
       linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
       linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
@@ -1659,22 +1654,17 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background-color: rgba(9, 9, 11, 0.84);
-    background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
-    background-size: 48px 48px;
-    background-attachment: fixed;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #181c24;
     color: #8b96a6;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.12s ease, filter 0.12s ease, border-color 0.2s, color 0.2s;
+    transition: transform 0.12s ease, filter 0.12s ease, border-color 0.2s, background 0.2s, color 0.2s;
     flex-shrink: 0;
   }
-  .cfg-close:hover { border-color: rgba(82, 116, 144, 0.4); color: #527490; }
+  .cfg-close:hover { background: #1f2533; border-color: rgba(82, 116, 144, 0.4); color: #527490; }
   .cfg-close:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .cfg-body {
