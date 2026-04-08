@@ -4,6 +4,15 @@
 
   let { token, onClose } = $props();
 
+  // Decode own userId from JWT payload (no crypto — server validates signature on every request)
+  const selfId = (() => {
+    try {
+      return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).userId ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
   let activeTab = $state('codes'); // 'codes' | 'users'
 
   let codes = $state([]);
@@ -454,20 +463,22 @@
                     <span class="user-date">{formatUserDate(u.createdAt)}</span>
                   </div>
                 </div>
-                {#if !u.isAdmin}
+                {#if !u.isAdmin || u.id === selfId}
                   <div class="user-actions">
                     <button class="btn-icon btn-edit" class:btn-edit-active={editingUsesId === u.id} onclick={() => editingUsesId === u.id ? cancelEditUses() : startEditUses(u)} aria-label="Set uses">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
                     </button>
-                    {#if u.status !== 'active'}
-                      <button class="btn-small btn-approve" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'active')} aria-label="Approve user">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </button>
-                    {/if}
-                    {#if u.status !== 'suspended'}
-                      <button class="btn-small btn-reject" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'suspended')} aria-label="Suspend user">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                      </button>
+                    {#if !u.isAdmin}
+                      {#if u.status !== 'active'}
+                        <button class="btn-small btn-approve" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'active')} aria-label="Approve user">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                      {/if}
+                      {#if u.status !== 'suspended'}
+                        <button class="btn-small btn-reject" disabled={updatingUserId === u.id} onclick={() => handleUpdateUser(u.id, 'suspended')} aria-label="Suspend user">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                      {/if}
                     {/if}
                   </div>
                 {/if}

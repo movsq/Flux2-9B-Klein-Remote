@@ -216,7 +216,6 @@ function getSessionInvalidReason(jwtPayload, rawToken) {
 
   const user = getUserById(jwtPayload.userId);
   if (!user || user.status !== 'active') return 'account_suspended';
-  if (user.uses_remaining !== null && user.uses_remaining <= 0) return 'no_uses_remaining';
   return null;
 }
 
@@ -287,8 +286,8 @@ app.post('/auth/google', async (req, res) => {
     });
     return res.json({
       token,
-      tosAccepted: (existing.tos_version ?? 0) >= TOS_VERSION,
-      user: { name: existing.name, email: existing.email, status: existing.status, isAdmin: !!existing.is_admin, usesRemaining: existing.uses_remaining ?? null, tosAccepted: (existing.tos_version ?? 0) >= TOS_VERSION },
+      tosAccepted: existing.tos_version === TOS_VERSION,
+      user: { name: existing.name, email: existing.email, status: existing.status, isAdmin: !!existing.is_admin, usesRemaining: existing.uses_remaining ?? null, tosAccepted: existing.tos_version === TOS_VERSION },
     });
   }
 
@@ -348,7 +347,7 @@ app.get('/auth/me', (req, res) => {
     status: user.status,
     isAdmin: !!user.is_admin,
     usesRemaining: user.uses_remaining ?? null,
-    tosAccepted: (user.tos_version ?? 0) >= TOS_VERSION,
+    tosAccepted: user.tos_version === TOS_VERSION,
   });
 });
 
@@ -1346,7 +1345,7 @@ function handleJobSubmit(phoneWs, msg, jwtPayload, queueUserId, wsSessionId) {
       return;
     }
     // ── Terms of Service gate ──────────────────────────────────────────────────
-    if ((userRow.tos_version ?? 0) < TOS_VERSION) {
+    if (userRow.tos_version !== TOS_VERSION) {
       sendJson(phoneWs, { type: 'error', message: 'tos_not_accepted' });
       return;
     }

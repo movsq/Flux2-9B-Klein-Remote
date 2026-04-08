@@ -637,7 +637,7 @@
       {token}
       isCodeUser={!isGoogleUser}
       onAccepted={() => { tosAccepted = true; showTerms = false; }}
-      onDeclined={() => { showTerms = true; }}
+      onDeclined={() => { showTerms = false; }}
     />
   {/if}
 
