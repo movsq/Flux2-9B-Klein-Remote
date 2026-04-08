@@ -219,30 +219,18 @@
     return () => onRegisterInputSetter(null);
   });
 
-  // Scroll peek — briefly nudge down on open to show content is scrollable
-  // Also hides gradient immediately when content doesn't need to scroll
+  // Hides gradient when content doesn't need to scroll, shows it when it does.
   $effect(() => {
     const el = cfgBodyEl;
     if (!el) return;
     cfgScrolledNearBottom = false;
-    let peekTimer = null;
-    let peekTimer2 = null;
     const rafId = requestAnimationFrame(() => {
       if (el.scrollHeight <= el.clientHeight) {
         cfgScrolledNearBottom = true;
-        return;
       }
-      peekTimer = setTimeout(() => {
-        if (el.scrollHeight > el.clientHeight) {
-          el.scrollTo({ top: 80, behavior: 'smooth' });
-          peekTimer2 = setTimeout(() => el.scrollTo({ top: 0, behavior: 'smooth' }), 540);
-        }
-      }, 360);
     });
     return () => {
       cancelAnimationFrame(rafId);
-      clearTimeout(peekTimer);
-      clearTimeout(peekTimer2);
     };
   });
 
