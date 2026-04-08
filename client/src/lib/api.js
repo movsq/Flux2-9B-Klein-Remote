@@ -203,6 +203,14 @@ export async function getResultFull(token, id) {
   return res.json();
 }
 
+export async function getResultThumb(token, id) {
+  const res = await fetch(`/results/${id}/thumb`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return res;
+}
+
 export async function deleteResult(token, id) {
   const res = await fetch(`/results/${id}`, {
     method: 'DELETE',

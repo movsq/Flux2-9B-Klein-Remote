@@ -21,6 +21,7 @@ Workflow image-count modes
 
 import asyncio
 import copy
+import io
 import json
 import logging
 import struct
@@ -28,6 +29,8 @@ import uuid
 import zlib
 from pathlib import Path
 from urllib.parse import urlparse
+
+from PIL import Image
 
 import aiohttp
 import websockets
@@ -258,6 +261,21 @@ def _detect_extension(image_bytes: bytes) -> str:
     if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
         return ".webp"
     raise ValueError("Unrecognised image format: only JPEG, PNG, and WebP are accepted")
+
+
+def generate_thumbnail(image_bytes: bytes, max_width: int = 200) -> bytes:
+    """
+    Generate a 200px-wide WebP thumbnail from raw image bytes.
+    Runs synchronously — call via run_in_executor to avoid blocking the event loop.
+    """
+    img = Image.open(io.BytesIO(image_bytes))
+    # Ensure RGB so WebP encoder doesn't have to handle palette/alpha modes
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+    img.thumbnail((max_width, max_width), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=75)
+    return buf.getvalue()
 
 
 # ── ComfyUI API communication ──────────────────────────────────────────────────

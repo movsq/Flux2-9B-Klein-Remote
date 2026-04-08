@@ -14,6 +14,7 @@ Environment variables (or edit config.py):
 """
 
 import asyncio
+import base64
 import json
 import logging
 import ssl
@@ -24,7 +25,7 @@ from websockets.exceptions import ConnectionClosed
 
 from config import VPS_URL, PC_SECRET, RECONNECT_DELAY, SKIP_TLS_VERIFY
 from crypto_utils import load_public_key_b64, decrypt_job, encrypt_result
-from comfyui import process_job, interrupt_comfyui
+from comfyui import process_job, interrupt_comfyui, generate_thumbnail
 
 logging.basicConfig(
     level=logging.INFO,
@@ -163,11 +164,24 @@ async def handle_job(ws, msg: dict) -> None:
             log.info(f"[job {job_id}] Cancelled — skipping result.")
             return
 
+        # ── Generate thumbnail ────────────────────────────────────────────────
+        thumbnail_b64: str | None = None
+        try:
+            loop = asyncio.get_event_loop()
+            thumb_bytes = await loop.run_in_executor(None, generate_thumbnail, result_bytes)
+            thumbnail_b64 = base64.b64encode(thumb_bytes).decode()
+            log.info(f"[job {job_id}] Thumbnail generated ({len(thumb_bytes):,} bytes).")
+        except Exception as exc:
+            log.warning(f"[job {job_id}] Thumbnail generation failed (non-fatal): {exc}")
+
         # ── Encrypt result ────────────────────────────────────────────────────
         encrypted_result = encrypt_result(aes_key_bytes, result_bytes)
 
         # ── Send back ─────────────────────────────────────────────────────────
-        await ws.send(json.dumps({"type": "result", "jobId": job_id, "payload": encrypted_result}))
+        result_msg: dict = {"type": "result", "jobId": job_id, "payload": encrypted_result}
+        if thumbnail_b64:
+            result_msg["thumbnail"] = thumbnail_b64
+        await ws.send(json.dumps(result_msg))
         log.info(f"[job {job_id}] Result sent.")
 
     except asyncio.CancelledError:

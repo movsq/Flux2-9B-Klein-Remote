@@ -58,9 +58,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS stored_results (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         INTEGER NOT NULL REFERENCES users(id),
-    encrypted_thumb BLOB    NOT NULL,
+    thumb           BLOB,
     encrypted_full  BLOB    NOT NULL,
-    iv_thumb        BLOB    NOT NULL,
     iv_full         BLOB    NOT NULL,
     full_size_bytes INTEGER NOT NULL DEFAULT 0,
     created_at      INTEGER NOT NULL
@@ -144,6 +143,32 @@ if (db.pragma('user_version', { simple: true }) < 6) {
       ON job_audit_log(created_at);
   `);
   db.pragma('user_version = 6');
+}
+
+if (db.pragma('user_version', { simple: true }) < 7) {
+  // v7: Replace vault-encrypted thumbnails with server-side trusted thumbnails.
+  // The browser no longer encrypts and uploads thumbnail blobs; instead the PC
+  // client generates a 200px WebP thumbnail and sends it alongside the encrypted
+  // result. This removes encrypted_thumb / iv_thumb and adds the thumb column.
+  db.exec(`
+    CREATE TABLE stored_results_v7 (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id),
+      thumb           BLOB,
+      encrypted_full  BLOB    NOT NULL,
+      iv_full         BLOB    NOT NULL,
+      full_size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at      INTEGER NOT NULL
+    );
+    INSERT INTO stored_results_v7 (id, user_id, encrypted_full, iv_full, full_size_bytes, created_at)
+      SELECT id, user_id, encrypted_full, iv_full, full_size_bytes, created_at
+      FROM stored_results;
+    DROP TABLE stored_results;
+    ALTER TABLE stored_results_v7 RENAME TO stored_results;
+    CREATE INDEX IF NOT EXISTS idx_stored_results_user_date
+      ON stored_results(user_id, created_at DESC);
+  `);
+  db.pragma('user_version = 7');
 }
 
 // ── Prepared statements ───────────────────────────────────────────────────────
@@ -236,20 +261,24 @@ const stmtUpdateVault = db.prepare(`
 
 // Stored results
 const stmtCreateResult = db.prepare(`
-  INSERT INTO stored_results (user_id, encrypted_thumb, encrypted_full, iv_thumb, iv_full, full_size_bytes, created_at)
-  VALUES (@user_id, @encrypted_thumb, @encrypted_full, @iv_thumb, @iv_full, @full_size_bytes, @created_at)
+  INSERT INTO stored_results (user_id, thumb, encrypted_full, iv_full, full_size_bytes, created_at)
+  VALUES (@user_id, @thumb, @encrypted_full, @iv_full, @full_size_bytes, @created_at)
 `);
 
 const stmtListResults = db.prepare(
-  'SELECT id, encrypted_thumb, iv_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? AND id < ? ORDER BY created_at DESC LIMIT ?',
+  'SELECT id, (thumb IS NOT NULL) AS has_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? AND id < ? ORDER BY created_at DESC LIMIT ?',
 );
 
 const stmtListResultsFirst = db.prepare(
-  'SELECT id, encrypted_thumb, iv_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+  'SELECT id, (thumb IS NOT NULL) AS has_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
 );
 
 const stmtGetResultFull = db.prepare(
   'SELECT encrypted_full, iv_full FROM stored_results WHERE id = ? AND user_id = ?',
+);
+
+const stmtGetResultThumb = db.prepare(
+  'SELECT thumb FROM stored_results WHERE id = ? AND user_id = ?',
 );
 
 const stmtDeleteResult = db.prepare(
@@ -462,14 +491,17 @@ export function createStoredResult(userId, data) {
   const now = Date.now();
   const result = stmtCreateResult.run({
     user_id: userId,
-    encrypted_thumb: data.encryptedThumb,
+    thumb: data.thumb ?? null,
     encrypted_full: data.encryptedFull,
-    iv_thumb: data.ivThumb,
     iv_full: data.ivFull,
     full_size_bytes: data.fullSizeBytes ?? 0,
     created_at: now,
   });
   return { id: Number(result.lastInsertRowid), createdAt: now };
+}
+
+export function getStoredResultThumb(id, userId) {
+  return stmtGetResultThumb.get(id, userId) ?? null;
 }
 
 export function listStoredResults(userId, { limit = 20, before = null } = {}) {

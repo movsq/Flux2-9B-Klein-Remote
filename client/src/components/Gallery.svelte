@@ -36,7 +36,7 @@
     loadError = '';
     try {
       const data = await listResults(token, { limit: PAGE_LIMIT });
-      await decryptThumbnails(data);
+      await loadThumbnails(data);
       items = data;
       hasMore = data.length >= PAGE_LIMIT;
     } catch (err) {
@@ -52,7 +52,7 @@
     try {
       const last = items[items.length - 1];
       const data = await listResults(token, { limit: PAGE_LIMIT, before: last.id });
-      await decryptThumbnails(data);
+      await loadThumbnails(data);
       items = [...items, ...data];
       hasMore = data.length >= PAGE_LIMIT;
     } catch {
@@ -62,15 +62,23 @@
     }
   }
 
-  async function decryptThumbnails(results) {
+  async function loadThumbnails(results) {
     for (const r of results) {
-      try {
-        const encBuf = b64ToBuf(r.encryptedThumb);
-        const ivBuf = b64ToBuf(r.ivThumb);
-        const plain = await decryptBlob(masterKey, ivBuf, encBuf);
-        const blob = new Blob([plain], { type: 'image/webp' });
-        r._thumbUrl = URL.createObjectURL(blob);
-      } catch {
+      if (r.hasThumb) {
+        try {
+          const res = await fetch(`/results/${r.id}/thumb`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            r._thumbUrl = URL.createObjectURL(blob);
+          } else {
+            r._thumbUrl = null;
+          }
+        } catch {
+          r._thumbUrl = null;
+        }
+      } else {
         r._thumbUrl = null;
       }
     }

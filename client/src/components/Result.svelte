@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
-  import { encryptBlob, generateThumbnail, bufToB64 } from '../lib/vault-crypto.js';
+  import { encryptBlob, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
 
   let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null, onUseAsInput = null } = $props();
@@ -119,22 +119,17 @@
     saving = true;
     saveError = '';
     try {
-      // Generate thumbnail
-      const thumbBuf = await generateThumbnail(imageUrl);
-
       // Use cached bytes — avoids fetch(blob:) which is blocked by CSP connect-src
       const fullBuf = imageBytes;
 
-      // Encrypt both
-      const { ciphertext: encThumb, iv: ivThumb } = await encryptBlob(masterKey, thumbBuf);
+      // Encrypt full image
       const { ciphertext: encFull, iv: ivFull } = await encryptBlob(masterKey, fullBuf);
 
       await saveResult(token, {
-        encryptedThumb: bufToB64(encThumb),
-        ivThumb: bufToB64(ivThumb),
         encryptedFull: bufToB64(encFull),
         ivFull: bufToB64(ivFull),
         fullSizeBytes: fullBuf.length,
+        jobId: result?.jobId ?? null,
       });
 
       saved = true;
