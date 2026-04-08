@@ -17,6 +17,7 @@
   let useInputOpen = $state(false);
   let assigningInput = $state(false);
   let inputAssignError = $state('');
+  let confirmDiscard = $state(false);
 
   const DECRYPT_TIMEOUT_MS = 15_000;
   let _decryptInFlight = false; // re-entry guard
@@ -201,16 +202,26 @@
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 9l2.5 2.5L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Save
             </button>
-            <button class="overlay-pill overlay-pill-discard" onclick={onDone}>
+            {#if confirmDiscard}
+              <button class="overlay-pill" onclick={() => confirmDiscard = false}>Cancel</button>
+              <button class="overlay-pill overlay-pill-discard" onclick={onDone}>Discard</button>
+            {:else}
+              <button class="overlay-pill overlay-pill-discard" onclick={() => confirmDiscard = true}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Discard
+              </button>
+            {/if}
+          {/if}
+        {:else}
+          {#if confirmDiscard}
+            <button class="overlay-pill" onclick={() => confirmDiscard = false}>Cancel</button>
+            <button class="overlay-pill overlay-pill-discard" onclick={onDone}>Discard</button>
+          {:else}
+            <button class="overlay-pill overlay-pill-discard" onclick={() => confirmDiscard = true}>
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               Discard
             </button>
           {/if}
-        {:else}
-          <button class="overlay-pill overlay-pill-discard" onclick={onDone}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Discard
-          </button>
         {/if}
 
         <!-- Use as Input -->

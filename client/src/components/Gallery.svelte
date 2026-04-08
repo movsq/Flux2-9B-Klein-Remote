@@ -25,6 +25,7 @@
 
   // Delete state
   let deletingId = $state(null);
+  let confirmDeleteId = $state(null);
 
   $effect(() => {
     loadInitial();
@@ -109,14 +110,15 @@
     viewError = '';
     useInputOpen = false;
     inputAssignError = '';
+    confirmDeleteId = null;
   }
 
   function prevImage() {
-    if (viewIndex > 0) viewFull(viewIndex - 1);
+    if (viewIndex > 0) { confirmDeleteId = null; viewFull(viewIndex - 1); }
   }
 
   function nextImage() {
-    if (viewIndex < items.length - 1) viewFull(viewIndex + 1);
+    if (viewIndex < items.length - 1) { confirmDeleteId = null; viewFull(viewIndex + 1); }
   }
 
   async function assignToInput(slot) {
@@ -274,10 +276,17 @@
               {/if}
             </div>
 
-            <button class="overlay-pill overlay-pill-discard" onclick={() => handleDelete(viewingId)} disabled={deletingId === viewingId}>
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              {deletingId === viewingId ? 'Deleting…' : 'Delete'}
-            </button>
+            {#if confirmDeleteId === viewingId}
+              <button class="overlay-pill" onclick={() => confirmDeleteId = null}>Cancel</button>
+              <button class="overlay-pill overlay-pill-discard" onclick={() => { confirmDeleteId = null; handleDelete(viewingId); }} disabled={deletingId === viewingId}>
+                {deletingId === viewingId ? 'Deleting…' : 'Delete'}
+              </button>
+            {:else}
+              <button class="overlay-pill overlay-pill-discard" onclick={() => confirmDeleteId = viewingId} disabled={deletingId === viewingId}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Delete
+              </button>
+            {/if}
           </div>
         </div>
 
