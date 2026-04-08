@@ -19,9 +19,14 @@
 
   $effect(() => {
     if (!scrollEl) return;
-    // Reset to top on mount/lang change. Also check if content fits without scrolling.
+    // Re-run whenever content or lang changes so scrollHeight is accurate.
+    const _deps = [tosHtml, lang];
+    // Reset to top; check if content already fits without scrolling.
     scrollEl.scrollTop = 0;
-    scrolledToBottom = scrollEl.scrollHeight <= scrollEl.clientHeight + 4;
+    // Defer one tick so the DOM has rendered the new content before measuring.
+    setTimeout(() => {
+      scrolledToBottom = scrollEl.scrollHeight <= scrollEl.clientHeight + 4;
+    }, 0);
   });
 
   function handleScroll(e) {
@@ -55,9 +60,9 @@
     <div class="header">
       <span class="title">{lang === 'en' ? 'TERMS OF SERVICE' : 'PODMÍNKY UŽÍVÁNÍ'}</span>
       <div class="lang-toggle">
-        <button class="lang-btn" class:active={lang === 'en'} onclick={() => { lang = 'en'; scrolledToBottom = false; scrollEl?.scrollTo(0, 0); }}>EN</button>
+        <button class="lang-btn" class:active={lang === 'en'} onclick={() => { lang = 'en'; }}>EN</button>
         <span class="lang-sep">|</span>
-        <button class="lang-btn" class:active={lang === 'cz'} onclick={() => { lang = 'cz'; scrolledToBottom = false; scrollEl?.scrollTo(0, 0); }}>CZ</button>
+        <button class="lang-btn" class:active={lang === 'cz'} onclick={() => { lang = 'cz'; }}>CZ</button>
       </div>
     </div>
 
