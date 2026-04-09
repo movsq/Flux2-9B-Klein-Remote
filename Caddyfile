@@ -6,6 +6,21 @@
 #   Custom domain:       flux2-klein.example.com        → Caddy auto-provisions Let's Encrypt
 #   Raw LAN IP:          192.168.1.100                  → add "tls internal" below
 
+# ── Cloudflare trusted proxies (global options) ────────────────────────────────
+# Uncomment the block below ONLY when your DNS record is proxied through Cloudflare
+# (orange cloud ☁ enabled).  Without this, Caddy sees Cloudflare's edge node IP
+# instead of the real visitor IP, which breaks IP-based rate-limiting and the
+# audit log.  It is also required so that header_up X-Real-IP carries the correct
+# client address down to the Node.js relay.
+# Not needed for Tailscale or direct-IP deployments.
+# Updated for 2026.  Latest list → https://www.cloudflare.com/ips/
+#
+# {
+#     servers {
+#         trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/20 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22
+#     }
+# }
+
 {$FLUX_KLEIN_HOST:localhost} {
     # ── Uncomment for Tailscale or other private-CA networks ──────────────────
     # tls internal
@@ -20,9 +35,12 @@
         Referrer-Policy strict-origin-when-cross-origin
     }
 
-    # ── API & WebSocket → Node.js relay ───────────────────────────────────────
+    # ── WebSocket → Node.js relay ──────────────────────────────────────────────
     handle /ws* {
         reverse_proxy server:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+
             # Disable read/write timeouts for long-lived WebSocket connections
             transport http {
                 read_timeout  0
@@ -31,29 +49,19 @@
             flush_interval -1
         }
     }
-    handle /auth* {
-        reverse_proxy server:3000
+
+    # ── API routes → Node.js relay ─────────────────────────────────────────────
+    @backend_routes {
+        path /auth* /tos* /pc-pubkey* /health* /codes* /vault* /results* /admin*
     }
-    handle /tos* {
-        reverse_proxy server:3000
-    }
-    handle /pc-pubkey* {
-        reverse_proxy server:3000
-    }
-    handle /health* {
-        reverse_proxy server:3000
-    }
-    handle /codes* {
-        reverse_proxy server:3000
-    }
-    handle /vault* {
-        reverse_proxy server:3000
-    }
-    handle /results* {
-        reverse_proxy server:3000
-    }
-    handle /admin* {
-        reverse_proxy server:3000
+    handle @backend_routes {
+        reverse_proxy server:3000 {
+            # Pass correct host, real IP, and protocol so OAuth redirects and
+            # IP-based rate-limiting work correctly behind any proxy layer.
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto https
+        }
     }
 
     # ── Frontend → static files built by Vite ─────────────────────────────────

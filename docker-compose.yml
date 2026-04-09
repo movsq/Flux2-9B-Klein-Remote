@@ -28,6 +28,7 @@ services:
       # Caddy uses FLUX_KLEIN_HOST as the site address in the Caddyfile ({$FLUX_KLEIN_HOST}).
       # Falls back to localhost when the variable is not set.
       - FLUX_KLEIN_HOST=${FLUX_KLEIN_HOST:-localhost}
+      - NODE_OPTIONS=--dns-result-order=ipv4first
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Built Svelte frontend is served as static files by Caddy directly.
