@@ -9,7 +9,7 @@
     checkWebAuthnSupport, checkPlatformAuthenticator, registerCredential,
   } from '../lib/webauthn.js';
 
-  let { token, vaultInfo, masterKey = null, userEmail = '', onClose, onUpdated, onRequestUnlock = () => {}, onVaultReset = () => {}, requestFreshGoogleToken = null } = $props();
+  let { token, vaultInfo, masterKey = null, userEmail = '', userType = 'google', onClose, onUpdated, onRequestUnlock = () => {}, onVaultReset = () => {}, requestFreshGoogleToken = null } = $props();
 
   let mode = $state('main'); // 'main' | 'recovery' | 'reset_confirm'
   let loading = $state(false);
@@ -22,6 +22,9 @@
 
   // Reset
   let resetConfirmText = $state('');
+
+  // Step-up password for email users (rekey / delete vault)
+  let stepUpPassword = $state('');
 
   // Platform authenticator detection
   let platformAvailable = $state(false);
@@ -69,10 +72,12 @@
       const bioWrappingKey = await deriveKeyFromPRF(reg.prfOutput, prfSalt);
       const wrappedBio = await wrapMasterKey(masterKey, bioWrappingKey);
 
-      // Step-up auth: get a fresh Google token to confirm identity
-      let idToken;
-      if (requestFreshGoogleToken) {
-        idToken = await requestFreshGoogleToken();
+      // Step-up auth: Google users provide a fresh ID token; email users confirm with password.
+      let stepUp = {};
+      if (userType !== 'google') {
+        stepUp = { password: stepUpPassword };
+      } else if (requestFreshGoogleToken) {
+        stepUp = { idToken: await requestFreshGoogleToken() };
       }
 
       // Update vault with new bio blob
@@ -80,10 +85,11 @@
         encryptedMasterKeyBio: bufToB64(wrappedBio),
         prfCredentialId: reg.credentialId,
         prfPublicKey: reg.publicKey,
-        idToken,
+        ...stepUp,
       });
 
       success = 'Biometric added successfully';
+      stepUpPassword = '';
       onUpdated();
     } catch (err) {
       error = err.message || 'Failed to add biometric';
@@ -135,12 +141,14 @@
     loading = true;
     error = '';
     try {
-      // Step-up auth: get a fresh Google token to confirm identity
-      let idToken;
-      if (requestFreshGoogleToken) {
-        idToken = await requestFreshGoogleToken();
+      // Step-up auth: Google users provide a fresh ID token; email users confirm with password.
+      let stepUp = {};
+      if (userType !== 'google') {
+        stepUp = { password: stepUpPassword };
+      } else if (requestFreshGoogleToken) {
+        stepUp = { idToken: await requestFreshGoogleToken() };
       }
-      await deleteVault(token, idToken);
+      await deleteVault(token, stepUp);
       onVaultReset();
     } catch (err) {
       error = err.message || 'Vault reset failed';
@@ -211,7 +219,13 @@
             <p class="hint">Checking for biometric support…</p>
           {:else}
             <p class="hint">Add fingerprint or Face ID to unlock your vault faster on this device.</p>
-            <button class="btn-primary" disabled={loading || !canAddBio} onclick={handleAddBiometric}>
+            {#if userType !== 'google'}
+              <div class="field">
+                <label class="field-label" for="bio-step-up-pw">Confirm password to continue</label>
+                <input id="bio-step-up-pw" type="password" bind:value={stepUpPassword} placeholder="Your password" autocomplete="current-password" disabled={loading} />
+              </div>
+            {/if}
+            <button class="btn-primary" disabled={loading || !canAddBio || (userType !== 'google' && !stepUpPassword)} onclick={handleAddBiometric}>
               {loading ? 'REGISTERING…' : 'ADD BIOMETRIC'}
             </button>
           {/if}
@@ -232,7 +246,7 @@
         </button>
       {/if}
 
-      <button class="settings-link danger" type="button" onclick={() => { mode = 'reset_confirm'; error = ''; success = ''; resetConfirmText = ''; }}>
+      <button class="settings-link danger" type="button" onclick={() => { mode = 'reset_confirm'; error = ''; success = ''; resetConfirmText = ''; stepUpPassword = ''; }}>
         Reset vault
       </button>
 
@@ -270,7 +284,7 @@
     {:else if mode === 'reset_confirm'}
       <div class="header">
         <span class="title">RESET VAULT</span>
-        <button class="close-btn" type="button" onclick={() => { mode = 'main'; error = ''; }} aria-label="Back">
+        <button class="close-btn" type="button" onclick={() => { mode = 'main'; error = ''; stepUpPassword = ''; }} aria-label="Back">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
@@ -288,11 +302,18 @@
         <input id="reset-confirm-settings" type="text" bind:value={resetConfirmText} placeholder="DELETE" autocomplete="off" disabled={loading} />
       </div>
 
+      {#if userType !== 'google'}
+        <div class="field">
+          <label class="field-label" for="reset-step-up-pw">Confirm password to delete vault</label>
+          <input id="reset-step-up-pw" type="password" bind:value={stepUpPassword} placeholder="Your password" autocomplete="current-password" disabled={loading} />
+        </div>
+      {/if}
+
       {#if error}
         <p class="error">{error}</p>
       {/if}
 
-      <button class="btn-danger" disabled={loading || resetConfirmText !== 'DELETE'} onclick={handleResetVault}>
+      <button class="btn-danger" disabled={loading || resetConfirmText !== 'DELETE' || (userType !== 'google' && !stepUpPassword)} onclick={handleResetVault}>
         {loading ? 'DELETING…' : 'DELETE VAULT'}
       </button>
     {/if}

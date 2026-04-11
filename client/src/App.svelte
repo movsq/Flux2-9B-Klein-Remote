@@ -645,6 +645,7 @@
       {vaultInfo}
       {masterKey}
       userEmail={user?.email ?? ''}
+      userType={user?.type}
       {requestFreshGoogleToken}
       onClose={() => showVaultSettings = false}
       onUpdated={() => { showVaultSettings = false; checkVault(); }}
