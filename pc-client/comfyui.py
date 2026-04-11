@@ -46,6 +46,11 @@ _WORKFLOW_TEMPLATE: dict = json.loads(_TEMPLATE_PATH.read_text())
 # Reject anything not in these sets to prevent path traversal or injection.
 _ALLOWED_SAMPLERS = {"euler", "res_multistep", "heun"}
 
+# Maximum seconds to wait for a single ComfyUI WebSocket message.
+# If ComfyUI hangs (OOM, GPU lock-up) with no cancel from the user, the recv
+# would block forever without this guard.  10 min covers even slow generations.
+_COMFYUI_WS_TIMEOUT = 600  # seconds
+
 def _validate_model_filename(name: str | None, label: str) -> None:
     """Reject model filenames that contain path separators or traversal sequences."""
     if name is None:
@@ -375,7 +380,15 @@ async def process_job(
         # ── Step 2: WebSocket — wait for execution to finish ───────────────────
         async with websockets.connect(ws_url) as ws_conn:
             while True:
-                raw = await ws_conn.recv()
+                try:
+                    raw = await asyncio.wait_for(
+                        ws_conn.recv(), timeout=_COMFYUI_WS_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    raise RuntimeError(
+                        f"ComfyUI WebSocket timed out after {_COMFYUI_WS_TIMEOUT}s "
+                        "with no progress — job considered failed."
+                    )
                 if isinstance(raw, bytes):
                     continue  # binary preview frames — ignore
                 msg = json.loads(raw)

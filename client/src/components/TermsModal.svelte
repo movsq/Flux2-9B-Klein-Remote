@@ -1,5 +1,6 @@
 <script>
   import { acceptTos, getTos } from '../lib/api.js';
+  import DOMPurify from 'dompurify';
 
   let { token, isCodeUser = false, viewOnly = false, onAccepted, onDeclined } = $props();
 
@@ -10,6 +11,10 @@
   let scrollEl;
 
   let tosHtml = $state(null); // { en: string, cz: string } once loaded
+  let safeHtml = $derived(tosHtml ? {
+    en: DOMPurify.sanitize(tosHtml.en, { USE_PROFILES: { html: true } }),
+    cz: DOMPurify.sanitize(tosHtml.cz, { USE_PROFILES: { html: true } }),
+  } : null);
 
   $effect(() => {
     getTos()
@@ -69,9 +74,9 @@
     </div>
 
     <div class="terms-scroll" onscroll={handleScroll} bind:this={scrollEl}>
-      {#if tosHtml}
+      {#if safeHtml}
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html tosHtml[lang]}
+        {@html safeHtml[lang]}
       {:else if !error}
         <p class="terms-text" style="opacity:0.45">Loading…</p>
       {/if}

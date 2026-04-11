@@ -471,6 +471,12 @@
     dismissedResults = dismissedResults.map(item => item.id === id ? { ...item, imageUrl: url } : item);
   }
 
+  // Mark a result as saved so the flag survives close/reopen cycles
+  function handleResultSaved(id) {
+    resultStack = resultStack.map(item => item.id === id ? { ...item, saved: true } : item);
+    dismissedResults = dismissedResults.map(item => item.id === id ? { ...item, saved: true } : item);
+  }
+
   // Re-open a dismissed result: cancel its expiry timer and bring it to the front.
   // expiresAt is preserved so handleClose can compute remaining shelf time if closed again.
   function reopenDismissed(id) {
@@ -604,6 +610,8 @@
         userType={user?.type ?? 'google'}
         onRequestVaultUnlock={requestVaultUnlock}
         onUseAsInput={handleUseAsInput}
+        initialSaved={item.saved ?? false}
+        onSaved={() => handleResultSaved(item.id)}
       />
     {/each}
   {/if}

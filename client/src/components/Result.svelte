@@ -4,14 +4,14 @@
   import { encryptBlob, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
 
-  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null, onUseAsInput = null } = $props();
+  let { result, aesKey, onDone, onClose, token = null, masterKey = null, userType = 'google', onRequestVaultUnlock = null, isGhost = false, stackOffset = 0, onImageReady = null, onUseAsInput = null, initialSaved = false, onSaved = () => {} } = $props();
 
   let imageUrl = $state(null);
   let imageBytes = $state(null); // raw PNG bytes, kept alongside imageUrl for save
   let decryptError = $state('');
   let decrypting = $state(true);
   let saving = $state(false);
-  let saved = $state(false);
+  let saved = $state(initialSaved ?? false);
   let saveError = $state('');
   let savePending = $state(false); // waiting for vault unlock/setup before saving
   let useInputOpen = $state(false);
@@ -125,14 +125,20 @@
       // Encrypt full image
       const { ciphertext: encFull, iv: ivFull } = await encryptBlob(masterKey, fullBuf);
 
-      await saveResult(token, {
-        encryptedFull: bufToB64(encFull),
-        ivFull: bufToB64(ivFull),
-        fullSizeBytes: fullBuf.length,
-        jobId: result?.jobId ?? null,
-      });
+      try {
+        await saveResult(token, {
+          encryptedFull: bufToB64(encFull),
+          ivFull: bufToB64(ivFull),
+          fullSizeBytes: fullBuf.length,
+          jobId: result?.jobId ?? null,
+        });
+      } catch (err) {
+        // 409 means this job was already saved — treat as success
+        if (!err.message?.includes('already saved')) throw err;
+      }
 
       saved = true;
+      onSaved(result?.jobId ?? null);
     } catch (err) {
       saveError = err.message || 'Save failed';
     } finally {

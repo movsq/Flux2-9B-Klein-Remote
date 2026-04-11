@@ -12,6 +12,7 @@ The public key is also printed as base64 so you can copy-paste it if needed.
 """
 
 import base64
+import getpass
 from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ec import (
     generate_private_key,
@@ -37,12 +38,21 @@ def main() -> None:
     private_key = generate_private_key(SECP256R1())
     public_key = private_key.public_key()
 
-    # Save private key (PEM, no passphrase — add one if you want extra local protection)
+    # Save private key (PEM, optional passphrase for encryption at rest)
+    passphrase_raw = getpass.getpass(
+        "[keygen] Enter passphrase to protect private key (leave blank for none): "
+    ).encode()
+    passphrase: bytes | None = passphrase_raw if passphrase_raw else None
+    encryption_algorithm = (
+        serialization.BestAvailableEncryption(passphrase)
+        if passphrase
+        else serialization.NoEncryption()
+    )
     priv_path.write_bytes(
         private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+            encryption_algorithm=encryption_algorithm,
         )
     )
     print(f"[keygen] Private key saved to: {PRIVATE_KEY_PATH}")

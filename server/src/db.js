@@ -259,6 +259,18 @@ if (db.pragma('user_version', { simple: true }) < 9) {
   db.pragma('user_version = 9');
 }
 
+if (db.pragma('user_version', { simple: true }) < 10) {
+  // v10: Add job_id to stored_results for save-deduplication.
+  // A per-user unique index on (user_id, job_id) prevents double-saves of the same job.
+  // The WHERE clause makes the index partial so rows with NULL job_id are not constrained.
+  db.exec(`
+    ALTER TABLE stored_results ADD COLUMN job_id TEXT DEFAULT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_stored_results_user_job_id
+      ON stored_results(user_id, job_id) WHERE job_id IS NOT NULL;
+  `);
+  db.pragma('user_version = 10');
+}
+
 // ── Prepared statements ───────────────────────────────────────────────────────
 
 // Users
@@ -350,9 +362,13 @@ const stmtUpdateVault = db.prepare(`
 
 // Stored results
 const stmtCreateResult = db.prepare(`
-  INSERT INTO stored_results (user_id, thumb, encrypted_full, iv_full, full_size_bytes, created_at)
-  VALUES (@user_id, @thumb, @encrypted_full, @iv_full, @full_size_bytes, @created_at)
+  INSERT INTO stored_results (user_id, thumb, encrypted_full, iv_full, full_size_bytes, job_id, created_at)
+  VALUES (@user_id, @thumb, @encrypted_full, @iv_full, @full_size_bytes, @job_id, @created_at)
 `);
+
+const stmtFindResultByJobId = db.prepare(
+  'SELECT id FROM stored_results WHERE user_id = ? AND job_id = ? LIMIT 1',
+);
 
 const stmtListResults = db.prepare(
   'SELECT id, (thumb IS NOT NULL) AS has_thumb, full_size_bytes, created_at FROM stored_results WHERE user_id = ? AND id < ? ORDER BY created_at DESC LIMIT ?',
@@ -613,9 +629,14 @@ export function createStoredResult(userId, data) {
     encrypted_full: data.encryptedFull,
     iv_full: data.ivFull,
     full_size_bytes: data.fullSizeBytes ?? 0,
+    job_id: data.jobId ?? null,
     created_at: now,
   });
   return { id: Number(result.lastInsertRowid), createdAt: now };
+}
+
+export function findStoredResultByJobId(userId, jobId) {
+  return stmtFindResultByJobId.get(userId, jobId) ?? null;
 }
 
 export function getStoredResultThumb(id, userId) {

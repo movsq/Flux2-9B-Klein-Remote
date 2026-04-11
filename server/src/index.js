@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -41,6 +42,7 @@ import {
   getStoredResultThumb,
   deleteStoredResult,
   countStoredResults,
+  findStoredResultByJobId,
   getAllUsers,
   updateUserStatus,
   updateUserUses,
@@ -266,9 +268,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : undefined; // undefined = allow all in dev
 if (!allowedOrigins && process.env.DEPLOY_MODE === 'remote') {
-  console.warn('[security] WARNING: ALLOWED_ORIGINS is not set in remote mode — CORS allows all origins.');
+  throw new Error('[security] ALLOWED_ORIGINS must be set in remote mode');
 }
 app.use(cors(allowedOrigins ? { origin: allowedOrigins } : undefined));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(express.json({ limit: '20mb' }));
 
 // Rate limiting
@@ -600,24 +603,40 @@ app.post('/vault/unlock', requireActive, (req, res) => {
   res.json({ encryptedMasterKey: blob.toString('base64') });
 });
 
+/** Step-up auth helper for vault mutation endpoints (/vault/rekey, DELETE /vault).
+ *  Authenticates Google users via idToken and email users via password confirmation. */
+async function requireVaultStepUp(req, res, userId) {
+  const user = getUserById(userId);
+  if (!user) { res.status(403).json({ error: 'Re-authentication failed' }); return false; }
+  if (user.google_sub) {
+    // Google user: require a fresh Google ID token
+    const { idToken } = req.body ?? {};
+    if (!idToken) { res.status(400).json({ error: 'Re-authentication required (idToken)' }); return false; }
+    try {
+      const googleUser = await verifyGoogleToken(idToken);
+      if (user.google_sub !== googleUser.sub) { res.status(403).json({ error: 'Re-authentication failed' }); return false; }
+    } catch { res.status(401).json({ error: 'Invalid Google token' }); return false; }
+    return true;
+  } else {
+    // Email user: require current password confirmation
+    const { password } = req.body ?? {};
+    if (!password) { res.status(400).json({ error: 'Re-authentication required (password)' }); return false; }
+    const emailAuth = findEmailAuthByUserId(userId);
+    if (!emailAuth) { res.status(403).json({ error: 'Re-authentication failed' }); return false; }
+    let ok = false;
+    try { ok = await argon2Verify(emailAuth.password_hash, password); } catch { res.status(500).json({ error: 'Re-authentication error' }); return false; }
+    if (!ok) { res.status(403).json({ error: 'Re-authentication failed' }); return false; }
+    return true;
+  }
+}
+
 /** POST /vault/rekey — re-wrap master key with new wrapping keys */
 app.post('/vault/rekey', requireActive, async (req, res) => {
   const userId = req.user.userId;
   const existing = getVaultByUser(userId);
   if (!existing) return res.status(404).json({ error: 'No vault configured' });
 
-  // ── Step-up auth: require a fresh Google ID token to prove identity ────────
-  const { idToken } = req.body ?? {};
-  if (!idToken) return res.status(400).json({ error: 'Re-authentication required (idToken)' });
-  try {
-    const googleUser = await verifyGoogleToken(idToken);
-    const user = getUserById(userId);
-    if (!user || user.google_sub !== googleUser.sub) {
-      return res.status(403).json({ error: 'Re-authentication failed' });
-    }
-  } catch {
-    return res.status(401).json({ error: 'Invalid Google token' });
-  }
+  if (!await requireVaultStepUp(req, res, userId)) return;
 
   const {
     encryptedMasterKeyBio, encryptedMasterKeyPw, encryptedMasterKeyRecovery,
@@ -642,18 +661,7 @@ app.delete('/vault', requireActive, async (req, res) => {
   const vault = getVaultByUser(req.user.userId);
   if (!vault) return res.status(404).json({ error: 'No vault configured' });
 
-  // ── Step-up auth: require a fresh Google ID token to prove identity ────────
-  const { idToken } = req.body ?? {};
-  if (!idToken) return res.status(400).json({ error: 'Re-authentication required (idToken)' });
-  try {
-    const googleUser = await verifyGoogleToken(idToken);
-    const user = getUserById(req.user.userId);
-    if (!user || user.google_sub !== googleUser.sub) {
-      return res.status(403).json({ error: 'Re-authentication failed' });
-    }
-  } catch {
-    return res.status(401).json({ error: 'Invalid Google token' });
-  }
+  if (!await requireVaultStepUp(req, res, req.user.userId)) return;
 
   deleteVault(req.user.userId);
   res.json({ ok: true });
@@ -672,6 +680,13 @@ app.post('/results', requireActive, express.json({ limit: '25mb' }), (req, res) 
   // ── Per-user storage quota ──────────────────────────────────────────────────
   if (countStoredResults(req.user.userId) >= MAX_RESULTS_PER_USER) {
     return res.status(429).json({ error: `Storage limit reached (max ${MAX_RESULTS_PER_USER} results)` });
+  }
+
+  // ── Deduplication: reject if this job was already saved ────────────────────
+  if (typeof jobId === 'string' && jobId) {
+    if (findStoredResultByJobId(req.user.userId, jobId)) {
+      return res.status(409).json({ error: 'Result already saved' });
+    }
   }
 
   if (typeof encryptedFull !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(encryptedFull)) {
@@ -708,6 +723,7 @@ app.post('/results', requireActive, express.json({ limit: '25mb' }), (req, res) 
     encryptedFull: fullBuf,
     ivFull: Buffer.from(ivFull, 'base64'),
     fullSizeBytes: sanitizedFullSizeBytes,
+    jobId: typeof jobId === 'string' && jobId ? jobId : null,
   });
 
   res.json(result);
@@ -1172,20 +1188,9 @@ server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname === '/ws/admin') {
-    const token = url.searchParams.get('token');
-    const payload = verifyJwt(token);
-    if (!payload) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    const adminUser = getUserById(payload.userId);
-    if (!adminUser || !adminUser.is_admin) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(req, socket, head, (ws) => handleAdminSocket(ws, adminUser.id));
+    // Token is authenticated via first WebSocket message (type: 'auth'),
+    // NOT via a URL query parameter, so JWTs are never written to proxy access logs.
+    wss.handleUpgrade(req, socket, head, (ws) => handleAdminSocketPending(ws));
     return;
   }
 
@@ -1704,7 +1709,9 @@ function handleJobSubmit(phoneWs, msg, jwtPayload, queueUserId, wsSessionId, cli
   try {
     createJobAuditLog({
       jobId,
-      userType: jwtPayload?.type === 'code_user' ? 'code' : 'google',
+      userType: jwtPayload?.type === 'code_user' ? 'code'
+              : jwtPayload?.type === 'email'     ? 'email'
+              : 'google',
       userId: _auditUserId,
       googleSub: _auditGoogleSub,
       email: _auditEmail,
@@ -1725,6 +1732,22 @@ function handleJobSubmit(phoneWs, msg, jwtPayload, queueUserId, wsSessionId, cli
 }
 
 // ── Admin socket handler ────────────────────────────────────────────────────────────
+function handleAdminSocketPending(ws) {
+  const authTimeout = setTimeout(() => ws.close(4001, 'Auth timeout'), 3_000);
+  ws.once('message', (raw) => {
+    clearTimeout(authTimeout);
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch { ws.close(4002, 'Invalid auth'); return; }
+    if (msg.type !== 'auth' || typeof msg.token !== 'string') { ws.close(4002, 'Expected auth'); return; }
+    const payload = verifyJwt(msg.token);
+    if (!payload) { sendJson(ws, { type: 'auth_failed' }); ws.close(4003, 'Invalid token'); return; }
+    const adminUser = getUserById(payload.userId);
+    if (!adminUser || !adminUser.is_admin) { sendJson(ws, { type: 'auth_failed' }); ws.close(4003, 'Not admin'); return; }
+    sendJson(ws, { type: 'auth_ok' });
+    handleAdminSocket(ws, adminUser.id);
+  });
+}
+
 function handleAdminSocket(ws, userId) {
   console.log(`[admin-ws] Connected (user ${userId}).`);
   adminSockets.set(ws, userId);

@@ -84,20 +84,37 @@
 
   function connectAdminWS() {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${location.host}/ws/admin?token=${encodeURIComponent(token)}`);
+    // Token is sent as the first WebSocket message (type: 'auth'), NOT in the URL,
+    // so it is never written to proxy access logs.
+    const ws = new WebSocket(`${protocol}://${location.host}/ws/admin`);
     adminWs = ws;
     wsStatus = 'connecting';
     wsStatusText = 'Connecting live updates...';
 
+    let _authenticated = false;
+
     ws.addEventListener('open', () => {
-      _reconnectDelay = 2000; // reset backoff on successful connect
-      wsStatus = 'connected';
-      wsStatusText = '';
+      ws.send(JSON.stringify({ type: 'auth', token }));
     });
 
     ws.addEventListener('message', (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
+
+      if (!_authenticated) {
+        if (msg.type === 'auth_ok') {
+          _authenticated = true;
+          _reconnectDelay = 2000; // reset backoff on successful connect
+          wsStatus = 'connected';
+          wsStatusText = '';
+        } else if (msg.type === 'auth_failed') {
+          wsStatus = 'error';
+          wsStatusText = 'Live updates: authentication failed.';
+          ws.close();
+        }
+        return;
+      }
+
       if (msg.type === 'codes_changed') {
         debouncedLoadCodes();
       } else if (msg.type === 'users_changed') {

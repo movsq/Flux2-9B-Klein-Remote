@@ -60,7 +60,7 @@ export function signJwt({ userId, googleSub, status, isAdmin, codeId, type }) {
 
 export function verifyJwt(token) {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     if (payload.jti && isTokenRevoked(payload.jti)) return null;
     return payload;
   } catch {

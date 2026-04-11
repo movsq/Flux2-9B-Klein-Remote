@@ -41,10 +41,23 @@ MAX_PROMPT_LEN = 4_000  # characters; enforces the same limit as the client text
 
 # ── Keypair loading ────────────────────────────────────────────────────────────
 
-def load_private_key():
-    """Load the PC's static P-256 private key from disk."""
-    pem = Path(PRIVATE_KEY_PATH).read_bytes()
-    return serialization.load_pem_private_key(pem, password=None)
+_private_key_cache = None  # loaded once on first use to avoid repeated disk I/O
+
+
+def load_private_key(password: bytes | None = None):
+    """
+    Load the PC's static P-256 private key from disk.
+
+    The result is cached after the first successful load so subsequent calls
+    (e.g. per-job decryption) skip the disk read + DER parse entirely.
+
+    Pass ``password`` if the key was generated with a passphrase via keygen.py.
+    """
+    global _private_key_cache
+    if _private_key_cache is None:
+        pem = Path(PRIVATE_KEY_PATH).read_bytes()
+        _private_key_cache = serialization.load_pem_private_key(pem, password=password)
+    return _private_key_cache
 
 
 def load_public_key_b64() -> str:

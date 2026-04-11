@@ -236,13 +236,13 @@
 
   function handleFileChange1(e) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !file.type.startsWith('image/')) return;
     setSlot1(file);
     e.target.value = '';
   }
   function handleFileChange2(e) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !file.type.startsWith('image/')) return;
     setSlot2(file);
     e.target.value = '';
   }

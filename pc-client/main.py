@@ -189,7 +189,10 @@ async def handle_job(ws, msg: dict) -> None:
     except Exception as exc:
         log.exception(f"[job {job_id}] Error processing job: {exc}")
         try:
-            await ws.send(json.dumps({"type": "error", "jobId": job_id, "message": str(exc)}))
+            # Keep full detail in local logs only; never forward internal error
+            # strings (which may contain filesystem paths) over the relay.
+            safe_msg = "Job processing failed. Check PC client logs for details."
+            await ws.send(json.dumps({"type": "error", "jobId": job_id, "message": safe_msg}))
         except Exception:
             pass  # don't let error reporting crash the client
 
