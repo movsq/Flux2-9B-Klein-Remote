@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { listResults, getResultFull, deleteResult } from '../lib/api.js';
   import { decryptBlob, b64ToBuf } from '../lib/vault-crypto.js';
 
@@ -309,7 +309,7 @@
 <style>
   .backdrop {
     position: fixed; inset: 0; z-index: 50;
-    background: rgba(0, 0, 0, 0.78);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(8px);
     display: flex; align-items: flex-end; justify-content: center;
     animation: fade-in 0.22s ease both;
@@ -321,8 +321,8 @@
 
   .panel {
     width: 100%; max-width: 460px;
-    background: rgba(14, 14, 18, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.25rem 1.25rem;
     backdrop-filter: blur(24px);
@@ -342,7 +342,7 @@
 
   .handle {
     width: 2.5rem; height: 3px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center; margin: 1rem 0 0.5rem; flex-shrink: 0;
   }
   @media (min-width: 480px) { .handle { display: none; } }
@@ -353,29 +353,29 @@
   }
   .title {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.22em; color: #527490;
+    font-size: 0.65rem; letter-spacing: 0.22em; color: var(--accent-primary);
   }
   .close-btn {
     width: 2rem; height: 2rem; border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: #a4afbb; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: transform 0.12s, background 0.2s, color 0.2s;
   }
-  .close-btn:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .close-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
   .close-btn:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .status {
     font-family: 'DM Mono', monospace;
-    color: #527490; font-size: 0.8rem; letter-spacing: 0.08em; margin: 0; text-align: center;
+    color: var(--accent-primary); font-size: 0.8rem; letter-spacing: 0.08em; margin: 0; text-align: center;
   }
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070; font-size: 0.78rem; margin: 0;
+    color: var(--state-error); font-size: 0.78rem; margin: 0;
   }
   .empty {
     font-family: 'DM Mono', monospace;
-    color: #525a66; font-size: 0.8rem; text-align: center; margin: 2rem 0;
+    color: var(--text-muted); font-size: 0.8rem; text-align: center; margin: 2rem 0;
   }
 
   .grid {
@@ -387,8 +387,8 @@
   .thumb-card {
     aspect-ratio: 1;
     border-radius: 0.625rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-hover);
     overflow: hidden;
     cursor: pointer;
     position: relative;
@@ -396,7 +396,7 @@
     padding: 0;
   }
   .thumb-card:hover {
-    border-color: rgba(82, 116, 144, 0.3);
+    border-color: var(--accent-primary-border);
     transform: scale(1.02);
   }
   .thumb-card:active { transform: scale(0.96); }
@@ -408,30 +408,29 @@
   .thumb-broken {
     width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center;
-    color: #525a66; font-family: 'DM Mono', monospace; font-size: 1.2rem;
+    color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 1.2rem;
   }
   .thumb-meta {
     position: absolute; bottom: 0; left: 0; right: 0;
     padding: 0.2rem 0.35rem;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
     font-family: 'DM Mono', monospace; font-size: 0.52rem;
-    color: #a4afbb; text-align: right;
+    color: var(--text-secondary); text-align: right;
   }
 
   .load-more {
     align-self: center;
     padding: 0.5rem 1.5rem;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-well-glass);
+    border: 1px solid var(--border-subtle);
     border-radius: 3rem;
-    color: #8b96a6;
+    color: var(--text-secondary);
     font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em;
     cursor: pointer; transition: background 0.2s, color 0.2s;
   }
-  .load-more:hover { background: rgba(255, 255, 255, 0.1); color: #c2ccd5; }
+  .load-more:hover { background: var(--surface-hover); color: var(--text-primary); }
   .load-more:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Full image viewer */
   .view-backdrop {
     position: fixed; inset: 0; z-index: 110;
     background: rgba(0, 0, 0, 0.88);
@@ -446,8 +445,8 @@
     width: 100%;
     max-width: 520px;
     max-height: calc(100dvh - 2rem);
-    background: rgba(12, 12, 16, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 1rem 1rem;
     padding: 1rem;
     backdrop-filter: blur(24px);
@@ -486,7 +485,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.22em;
-    color: #527490;
+    color: var(--accent-primary);
     font-weight: 400;
   }
 
@@ -530,9 +529,9 @@
     pointer-events: auto;
     padding: 0.5rem;
     border-radius: 50%;
-    background: rgba(9, 9, 11, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #c2ccd5;
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
@@ -547,8 +546,8 @@
   }
 
   .view-overlay-download:hover {
-    background: rgba(82, 116, 144, 0.55);
-    color: #eef3f8;
+    background: var(--accent-primary-dim);
+    color: var(--text-primary);
   }
 
   .view-overlay-download:active { transform: scale(0.88); }
@@ -589,9 +588,9 @@
     letter-spacing: 0.08em;
     font-weight: 500;
     cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(9, 9, 11, 0.72);
-    color: #c2ccd5;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-raised-glass);
+    color: var(--text-primary);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     transition: background 0.15s, border-color 0.15s, transform 0.1s, color 0.15s;
@@ -604,9 +603,9 @@
   }
 
   .overlay-pill:hover {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.28);
-    color: #eef3f8;
+    background: var(--surface-active);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
   }
 
   .overlay-pill:active { transform: scale(0.93); }
@@ -618,14 +617,14 @@
   }
 
   .overlay-pill-discard {
-    color: #c47070;
-    border-color: rgba(196, 112, 112, 0.35);
+    color: var(--state-error);
+    border-color: var(--state-error-border);
   }
 
   .overlay-pill-discard:hover {
-    background: rgba(196, 112, 112, 0.28);
-    border-color: rgba(196, 112, 112, 0.6);
-    color: #e07070;
+    background: var(--state-error-bg);
+    border-color: var(--state-error);
+    color: var(--state-error);
   }
 
   .overlay-chevron {
@@ -660,9 +659,9 @@
     gap: 0.35rem;
     padding: 0.4rem;
     border-radius: 0.75rem;
-    background: rgba(9, 9, 11, 0.94);
-    border: 1px solid rgba(82, 116, 144, 0.4);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    background: var(--surface-overlay-glass);
+    border: 1px solid var(--accent-primary-border);
+    box-shadow: 0 8px 24px var(--shadow-panel);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     z-index: 10;
@@ -670,9 +669,9 @@
   }
 
   .picker-btn {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
-    color: #d1dae3;
+    border: 1px solid var(--border-default);
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     border-radius: 0.6rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.66rem;
@@ -682,9 +681,9 @@
   }
 
   .picker-btn:hover {
-    background: rgba(82, 116, 144, 0.28);
-    border-color: rgba(82, 116, 144, 0.52);
-    color: #eef3f8;
+    background: var(--accent-primary-dim);
+    border-color: var(--accent-primary-border);
+    color: var(--text-primary);
   }
 
   .picker-btn:disabled {

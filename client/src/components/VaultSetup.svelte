@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { setupVault } from '../lib/api.js';
   import {
     generateMasterKey, exportMasterKey,
@@ -358,7 +358,7 @@
     position: fixed;
     inset: 0;
     z-index: 110;
-    background: rgba(0, 0, 0, 0.78);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(8px);
     display: flex;
     align-items: flex-end;
@@ -373,8 +373,8 @@
   .panel {
     width: 100%;
     max-width: 400px;
-    background: rgba(14, 14, 18, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.75rem 1.75rem;
     backdrop-filter: blur(24px);
@@ -403,7 +403,7 @@
 
   .handle {
     width: 2.5rem; height: 3px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center; margin: 1rem 0 0.5rem; flex-shrink: 0;
   }
   @media (min-width: 480px) { .handle { display: none; } }
@@ -414,23 +414,23 @@
   }
   .title {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.22em; color: #527490;
+    font-size: 0.65rem; letter-spacing: 0.22em; color: var(--accent-primary);
   }
   .close-btn {
     width: 2rem; height: 2rem; border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: #a4afbb; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: transform 0.12s, background 0.2s, color 0.2s;
   }
-  .close-btn:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .close-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
   .close-btn:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .desc {
     font-family: 'DM Mono', monospace;
-    font-size: 0.75rem; color: #8b96a6; line-height: 1.6; margin: 0;
+    font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; margin: 0;
   }
-  .desc strong { color: #c2ccd5; }
+  .desc strong { color: var(--text-primary); }
 
   .methods {
     display: flex; flex-direction: column; gap: 0.75rem;
@@ -439,26 +439,26 @@
   .method-btn {
     display: flex; align-items: center; gap: 0.875rem;
     padding: 1rem 1.125rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.875rem;
-    color: #e4e4e7; cursor: pointer;
+    color: var(--text-primary); cursor: pointer;
     transition: transform 0.12s, background 0.2s, border-color 0.2s;
   }
   .method-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(82, 116, 144, 0.3);
+    background: var(--surface-active);
+    border-color: var(--accent-primary-border);
   }
   .method-btn:active:not(:disabled) { transform: scale(0.97); }
   .method-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  .method-btn svg { color: #527490; flex-shrink: 0; }
+  .method-btn svg { color: var(--accent-primary); flex-shrink: 0; }
   .method-label {
     font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 600;
   }
   .method-sub {
     font-family: 'DM Mono', monospace; font-size: 0.65rem;
-    color: #6c7585; letter-spacing: 0.04em; margin-left: auto;
+    color: var(--text-muted); letter-spacing: 0.04em; margin-left: auto;
   }
 
   .pw-form { display: flex; flex-direction: column; gap: 0.875rem; }
@@ -467,44 +467,44 @@
 
   .field-label {
     font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.18em; color: #8b96a6;
+    font-size: 0.6rem; letter-spacing: 0.18em; color: var(--text-secondary);
     margin-bottom: 0.35rem;
   }
 
   .field input {
     padding: 0.72rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: #e4e4e7;
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace; font-size: 0.85rem;
     outline: none; transition: border-color 0.2s;
   }
-  .field input::placeholder { color: #6c7585; }
-  .field input:focus { border-color: rgba(82, 116, 144, 0.4); }
+  .field input::placeholder { color: var(--text-muted); }
+  .field input:focus { border-color: var(--border-focus); }
 
   .btn-primary {
     padding: 0.8rem; border: none; border-radius: 3rem;
-    background: #527490; color: #09090b;
+    background: var(--accent-primary); color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
     cursor: pointer;
     transition: transform 0.12s, filter 0.12s, background 0.2s;
   }
-  .btn-primary:hover:not(:disabled) { background: #7d9db6; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-primary-hover); }
   .btn-primary:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-secondary {
     flex: 1; padding: 0.65rem 0.875rem;
-    background: rgba(255, 255, 255, 0.06); color: #c2ccd5;
-    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 3rem;
+    background: var(--surface-well-glass); color: var(--text-secondary);
+    border: 1px solid var(--border-subtle); border-radius: 3rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem; letter-spacing: 0.08em;
     cursor: pointer;
     transition: transform 0.12s, background 0.2s, color 0.2s;
   }
-  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .btn-secondary:hover { background: var(--surface-hover); color: var(--text-primary); }
   .btn-secondary:active { transform: scale(0.95); }
 
   .word-grid {
@@ -512,17 +512,17 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 0.4rem;
     padding: 0.875rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
   }
 
   .word {
     font-family: 'DM Mono', monospace;
-    font-size: 0.68rem; color: #e4e4e7;
+    font-size: 0.68rem; color: var(--text-primary);
     padding: 0.2rem 0;
   }
-  .word-num { color: #525a66; font-size: 0.58rem; }
+  .word-num { color: var(--text-muted); font-size: 0.58rem; }
 
   .recovery-actions {
     display: flex; gap: 0.75rem;
@@ -534,38 +534,38 @@
   .checkbox-row input[type='checkbox'] {
     appearance: none; -webkit-appearance: none;
     width: 16px; height: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    background: var(--surface-well-glass);
     cursor: pointer; flex-shrink: 0; position: relative;
     transition: border-color 0.2s, background 0.2s;
   }
   .checkbox-row input[type='checkbox']:checked {
-    border-color: #527490; background: rgba(82, 116, 144, 0.2);
+    border-color: var(--accent-primary); background: var(--accent-primary-dim);
   }
   .checkbox-row input[type='checkbox']:checked::after {
     content: ''; position: absolute; top: 2px; left: 5px;
     width: 4px; height: 8px;
-    border: solid #527490; border-width: 0 1.5px 1.5px 0;
+    border: solid var(--accent-primary); border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
   }
   .checkbox-label {
     font-family: 'DM Mono', monospace;
-    font-size: 0.78rem; color: #a4afbb;
+    font-size: 0.78rem; color: var(--text-secondary);
   }
 
   .skip-link {
     background: none; border: none;
     font-family: 'DM Mono', monospace;
-    font-size: 0.68rem; color: #525a66; letter-spacing: 0.05em;
+    font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.05em;
     cursor: pointer; padding: 0.25rem 0;
     transition: color 0.2s;
     text-align: center;
   }
-  .skip-link:hover { color: #8b96a6; }
+  .skip-link:hover { color: var(--text-secondary); }
 
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070; font-size: 0.75rem; margin: 0;
+    color: var(--state-error); font-size: 0.75rem; margin: 0;
   }
 
   @media (hover: none) and (pointer: coarse) {

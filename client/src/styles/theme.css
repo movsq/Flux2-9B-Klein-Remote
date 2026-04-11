@@ -1,0 +1,78 @@
+/* ==========================================================================
+   ComfyLink Design Token System
+   Single source of truth for all color values.
+   Every hex, rgb, rgba, hsl value in the codebase must live here.
+   All other files reference only var(--token-name).
+   ========================================================================== */
+
+:root {
+
+  /* ── Surfaces — Solid (non-glass contexts) ──────────────────────────────
+     Used when backdrop-filter is not available or not appropriate.
+     Ordered darkest → lightest (base → overlay). */
+  --surface-base:             #0d1117;   /* page / app background */
+  --surface-raised:           #161b22;   /* cards, solid panels */
+  --surface-overlay:          #1f2430;   /* elevated solid overlays */
+  --surface-well:             #1a1f29;   /* inputs inset on solid surfaces */
+  --surface-hover:            rgba(255, 255, 255, 0.07);   /* subtle hover fill */
+  --surface-active:           rgba(255, 255, 255, 0.10);   /* pressed / selected fill */
+
+  /* ── Surfaces — Glass (pair with backdrop-filter: blur()) ───────────────
+     Semi-transparent variants for the glass-morphism panel system.
+     Values are calibrated to be clearly distinguishable from --surface-base. */
+  --surface-raised-glass:     rgba(22, 27, 34, 0.94);    /* primary modal / card panel */
+  --surface-overlay-glass:    rgba(28, 33, 42, 0.96);    /* elevated: drawer over panel */
+  --surface-backdrop:         rgba(0, 0, 0, 0.78);       /* full-screen dimming backdrop */
+  --surface-well-glass:       rgba(255, 255, 255, 0.12); /* inputs inside glass panels */
+
+  /* ── Borders ────────────────────────────────────────────────────────────
+     Ordered subtle → strong. Always use these — never hardcode rgba white. */
+  --border-subtle:            rgba(255, 255, 255, 0.07);  /* structural dividers, hr */
+  --border-default:           rgba(255, 255, 255, 0.12);  /* card / input edges */
+  --border-strong:            rgba(255, 255, 255, 0.20);  /* focused or elevated edges */
+  --border-focus:             rgba(82, 116, 144, 0.60);   /* keyboard focus ring */
+
+  /* ── Typography ─────────────────────────────────────────────────────────
+     All expressed as rgba(255,255,255,X) for correct darkmode behaviour.
+     --text-muted is at 0.45 — clears WCAG AA 4.5:1 with headroom
+     against --surface-base. Used only for placeholders & disabled states. */
+  --text-primary:             rgba(255, 255, 255, 0.88);  /* body, labels, headings */
+  --text-secondary:           rgba(255, 255, 255, 0.60);  /* captions, descriptions */
+  --text-muted:               rgba(255, 255, 255, 0.45);  /* placeholders, disabled */
+  --text-on-accent:           #ffffff;                    /* text on coloured buttons */
+
+  /* ── Accent ─────────────────────────────────────────────────────────────
+     Brand blue-grey. Dim / glow variants for fills and selected states. */
+  --accent-primary:           #527490;
+  --accent-primary-hover:     #7d9db6;
+  --accent-primary-dim:       rgba(82, 116, 144, 0.15);  /* badge bg, selected fills */
+  --accent-primary-glow:      rgba(82, 116, 144, 0.10);  /* ultra-subtle hover fills */
+  --accent-primary-border:    rgba(82, 116, 144, 0.30);  /* accent-tinted borders */
+
+  /* ── Feedback States ────────────────────────────────────────────────────
+     Hybrid muted palette — professional and readable without being harsh.
+     Lifted ~6% lightness from the legacy palette to pop on --surface-raised. */
+  --state-error:              #d68282;                    /* error text / icon */
+  --state-error-bg:           rgba(214, 130, 130, 0.12); /* error area fill */
+  --state-error-border:       rgba(214, 130, 130, 0.35); /* error border */
+  --state-error-strong:       #943b3b;                   /* destructive button bg */
+  --state-error-strong-hover: #b04848;                   /* destructive button hover */
+
+  --state-success:            #8dcf9e;                    /* success text / icon */
+  --state-success-bg:         rgba(141, 207, 158, 0.12); /* success area fill */
+  --state-success-border:     rgba(141, 207, 158, 0.25); /* success border */
+
+  --state-warning:            #d9b95c;                    /* warning text / icon */
+  --state-warning-bg:         rgba(217, 185, 92, 0.10);  /* warning area fill */
+  --state-warning-border:     rgba(217, 185, 92, 0.30);  /* warning border */
+
+  /* ── Special Badges ─────────────────────────────────────────────────────
+     Semantic colours for UI-only badges with no state meaning. */
+  --badge-purple:             #a08cc8;                    /* access-code user type */
+  --badge-purple-bg:          rgba(160, 140, 200, 0.15);
+
+  /* ── Misc ───────────────────────────────────────────────────────────────*/
+  --grid-line:                rgba(82, 116, 144, 0.07);  /* body background grid */
+  --shadow-panel:             rgba(0, 0, 0, 0.40);       /* box-shadow base — 40% max */
+
+}

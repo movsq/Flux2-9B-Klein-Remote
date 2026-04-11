@@ -308,8 +308,8 @@
 
       <div class="pending-msg">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="#527490" stroke-width="1.5"/>
-          <path d="M12 7v5l3 3" stroke="#527490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="10" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <path d="M12 7v5l3 3" stroke="var(--accent-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <p>Your account is pending admin approval. You'll be able to sign in once approved.</p>
       </div>
@@ -380,8 +380,8 @@
     gap: 1.25rem;
     width: 100%;
     max-width: 320px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem;
     padding: 2rem 1.75rem;
     backdrop-filter: blur(16px);
@@ -413,7 +413,7 @@
     font-family: 'Syne', sans-serif;
     font-size: 1.9rem;
     font-weight: 800;
-    color: #d4d4d8;
+    color: var(--text-primary);
     letter-spacing: -0.03em;
     line-height: 1;
   }
@@ -422,17 +422,17 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.18em;
-    color: #527490;
+    color: var(--accent-primary);
     font-weight: 400;
   }
 
   .notice {
     margin: -0.35rem 0 0;
     padding: 0.6rem 0.75rem;
-    border: 1px solid rgba(196, 153, 106, 0.35);
+    border: 1px solid var(--state-warning-border);
     border-radius: 0.65rem;
-    background: rgba(196, 153, 106, 0.08);
-    color: #f3d5b2;
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.05em;
@@ -450,7 +450,7 @@
     flex-shrink: 0;
     background: none;
     border: none;
-    color: #f3d5b2;
+    color: var(--state-warning);
     font-size: 1rem;
     line-height: 1;
     padding: 0;
@@ -499,7 +499,7 @@
   .placeholder-text {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: #3d4550;
+    color: var(--text-muted);
     letter-spacing: 0.08em;
   }
 
@@ -513,7 +513,7 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #3d4550;
+    background: var(--text-muted);
     animation: dotPulse 1.2s ease-in-out infinite;
   }
 
@@ -528,7 +528,7 @@
   .invite-prompt {
     font-family: 'DM Mono', monospace;
     font-size: 0.8rem;
-    color: #a4afbb;
+    color: var(--text-secondary);
     margin: 0;
     text-align: center;
   }
@@ -546,9 +546,9 @@
     -webkit-appearance: none;
     width: 16px;
     height: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-well-glass);
     cursor: pointer;
     flex-shrink: 0;
     position: relative;
@@ -556,8 +556,8 @@
   }
 
   .checkbox-row input[type='checkbox']:checked {
-    border-color: #527490;
-    background: rgba(82, 116, 144, 0.2);
+    border-color: var(--accent-primary);
+    background: var(--accent-primary-dim);
   }
 
   .checkbox-row input[type='checkbox']:checked::after {
@@ -567,7 +567,7 @@
     left: 5px;
     width: 4px;
     height: 8px;
-    border: solid #527490;
+    border: solid var(--accent-primary);
     border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
   }
@@ -575,16 +575,16 @@
   .checkbox-label {
     font-family: 'DM Mono', monospace;
     font-size: 0.78rem;
-    color: #a4afbb;
+    color: var(--text-secondary);
     letter-spacing: 0.02em;
   }
 
   .code-input {
     padding: 0.72rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-default);
     border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.06);
-    color: #f4f4f5;
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.95rem;
     outline: none;
@@ -595,21 +595,21 @@
   }
 
   .code-input::placeholder {
-    color: #6c7585;
+    color: var(--text-muted);
     letter-spacing: 0.05em;
     text-transform: none;
   }
 
   .code-input:focus {
-    border-color: rgba(82, 116, 144, 0.4);
+    border-color: var(--border-focus);
   }
 
   button {
     padding: 0.8rem 1.5rem;
     border: none;
     border-radius: 3rem;
-    background: #527490;
-    color: #09090b;
+    background: var(--accent-primary);
+    color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     font-weight: 500;
@@ -619,7 +619,7 @@
   }
 
   button:hover:not(:disabled) {
-    background: #7d9db6;
+    background: var(--accent-primary-hover);
   }
 
   button:active:not(:disabled) {
@@ -633,14 +633,14 @@
   }
 
   .btn-secondary {
-    background: rgba(255, 255, 255, 0.06);
-    color: #c2ccd5;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.11);
-    color: #e4e4e7;
+    background: var(--surface-active);
+    color: var(--text-primary);
   }
 
   .pending-msg {
@@ -654,14 +654,14 @@
   .pending-msg p {
     font-family: 'DM Mono', monospace;
     font-size: 0.78rem;
-    color: #8b96a6;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin: 0;
   }
 
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
@@ -675,12 +675,12 @@
   .divider-line {
     flex: 1;
     height: 1px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--border-subtle);
   }
   .divider-text {
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
-    color: #525a66;
+    color: var(--text-muted);
     letter-spacing: 0.15em;
   }
 
@@ -690,14 +690,14 @@
     padding: 0.25rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.7rem;
-    color: #525a66;
+    color: var(--text-muted);
     letter-spacing: 0.05em;
     cursor: pointer;
     transition: color 0.2s;
     text-align: center;
   }
   .btn-code-toggle:hover {
-    color: #8b96a6;
+    color: var(--text-secondary);
   }
 
   .login-bg {
@@ -730,7 +730,7 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.72);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
@@ -743,8 +743,8 @@
   .google-invite-card {
     width: 100%;
     max-width: 300px;
-    background: rgba(14, 14, 18, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-overlay-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem;
     padding: 1.5rem 1.5rem 1.25rem;
     display: flex;
@@ -761,7 +761,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.2em;
-    color: #527490;
+    color: var(--accent-primary);
     margin: 0;
     text-align: center;
   }
@@ -769,7 +769,7 @@
   .google-invite-body {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: #8b96a6;
+    color: var(--text-secondary);
     margin: 0;
     line-height: 1.55;
     text-align: center;

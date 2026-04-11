@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { onMount } from 'svelte';
   import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus, updateUserUses } from '../lib/api.js';
 
@@ -415,7 +415,7 @@
               <div class="code-actions">
                 <button class="btn-icon" onclick={() => handleCopy(code.code, code.id)} aria-label="Copy code">
                   {#if copyFeedback === code.id}
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7.5l2.5 2.5L11 4" stroke="#527490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7.5l2.5 2.5L11 4" stroke="var(--accent-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   {:else}
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M9.5 4.5V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5A1.5 1.5 0 003 9.5h1.5" stroke="currentColor" stroke-width="1.2"/></svg>
                   {/if}
@@ -551,7 +551,7 @@
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: rgba(0, 0, 0, 0.72);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     display: flex;
@@ -568,8 +568,8 @@
   .admin-panel {
     width: 100%;
     max-width: 440px;
-    background: rgba(14, 14, 18, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.75rem 1.75rem;
     backdrop-filter: blur(24px);
@@ -604,7 +604,7 @@
     width: 2.5rem;
     height: 3px;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center;
     margin: 1rem 0 0.75rem;
     flex-shrink: 0;
@@ -630,9 +630,9 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: #a4afbb;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -640,7 +640,7 @@
     transition: transform 0.12s ease, filter 0.12s ease, background 0.2s, color 0.2s;
     flex-shrink: 0;
   }
-  .admin-close:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .admin-close:hover { background: var(--surface-hover); color: var(--text-primary); }
   .admin-close:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .admin-body-wrap {
@@ -658,7 +658,7 @@
     left: 0;
     right: 0;
     height: 4rem;
-    background: linear-gradient(to bottom, transparent, rgba(14, 14, 18, 0.92));
+    background: linear-gradient(to bottom, transparent, var(--surface-raised-glass));
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
@@ -675,16 +675,16 @@
     flex-direction: column;
     gap: 1.25rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.28) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   .ws-status {
     margin: 0 0 0.7rem;
     padding: 0.5rem 0.65rem;
-    border: 1px solid rgba(196, 153, 106, 0.28);
+    border: 1px solid var(--state-warning-border);
     border-radius: 0.62rem;
-    background: rgba(196, 153, 106, 0.08);
-    color: #f3d5b2;
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
     font-family: 'DM Mono', monospace;
     font-size: 0.66rem;
     letter-spacing: 0.05em;
@@ -696,10 +696,10 @@
     gap: 0.5rem;
     margin: 0 0 0.9rem;
     padding: 0.5rem 0.65rem;
-    border: 1px solid rgba(196, 153, 106, 0.28);
+    border: 1px solid var(--state-warning-border);
     border-radius: 0.62rem;
-    background: rgba(196, 153, 106, 0.08);
-    color: #f3d5b2;
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
     font-family: 'DM Mono', monospace;
     font-size: 0.66rem;
     line-height: 1.55;
@@ -707,7 +707,7 @@
   }
   .admin-body::-webkit-scrollbar { width: 4px; }
   .admin-body::-webkit-scrollbar-track { background: transparent; }
-  .admin-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.28); border-radius: 2px; }
+  .admin-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
 
   .gen-section {
     display: flex;
@@ -719,7 +719,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.2em;
-    color: #6c7585;
+    color: var(--text-muted);
   }
 
   .gen-row {
@@ -738,16 +738,16 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.18em;
-    color: #8b96a6;
+    color: var(--text-secondary);
     margin-bottom: 0.35rem;
   }
 
   input[type='number'] {
     padding: 0.72rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: #e4e4e7;
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.85rem;
     outline: none;
@@ -764,15 +764,15 @@
     margin: 0;
   }
 
-  input[type='number']::placeholder { color: #6c7585; }
-  input[type='number']:focus { border-color: rgba(82, 116, 144, 0.4); }
+  input[type='number']::placeholder { color: var(--text-muted); }
+  input[type='number']:focus { border-color: var(--border-focus); }
 
   .btn-gen {
     padding: 0.8rem;
     border: none;
     border-radius: 3rem;
-    background: #527490;
-    color: #09090b;
+    background: var(--accent-primary);
+    color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     font-weight: 500;
@@ -780,13 +780,13 @@
     cursor: pointer;
     transition: transform 0.12s ease, filter 0.12s ease, background 0.2s;
   }
-  .btn-gen:hover:not(:disabled) { background: #7d9db6; }
+  .btn-gen:hover:not(:disabled) { background: var(--accent-primary-hover); }
   .btn-gen:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-gen:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.75rem;
     margin: 0;
   }
@@ -800,7 +800,7 @@
   .empty {
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
-    color: #6c7585;
+    color: var(--text-muted);
     margin: 0;
     text-align: center;
     padding: 1rem 0;
@@ -812,8 +812,8 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.65rem 0.875rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
     transition: opacity 0.2s;
   }
@@ -832,21 +832,21 @@
   .code-value {
     font-family: 'DM Mono', monospace;
     font-size: 0.8rem;
-    color: #e4e4e7;
+    color: var(--text-primary);
     letter-spacing: 0.08em;
   }
 
   .code-meta {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: #6c7585;
+    color: var(--text-muted);
     letter-spacing: 0.04em;
     display: flex;
     gap: 0.3rem;
   }
 
   .separator {
-    color: #525a66;
+    color: var(--text-muted);
   }
 
   .code-actions {
@@ -859,21 +859,21 @@
     width: 2rem;
     height: 2rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     background: transparent;
-    color: #8b96a6;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: transform 0.12s ease, background 0.2s, color 0.2s;
   }
-  .btn-icon:hover { background: rgba(255, 255, 255, 0.08); color: #e4e4e7; }
+  .btn-icon:hover { background: var(--surface-hover); color: var(--text-primary); }
   .btn-icon:active { transform: scale(0.88); }
 
-  .btn-delete:hover { color: #c47070; }
-  .btn-edit:hover { color: #527490; }
-  .btn-edit-active { color: #527490; background: rgba(82, 116, 144, 0.1); }
+  .btn-delete:hover { color: var(--state-error); }
+  .btn-edit:hover { color: var(--accent-primary); }
+  .btn-edit-active { color: var(--accent-primary); background: var(--accent-primary-glow); }
 
   /* Tabs */
   .tab-bar {
@@ -888,14 +888,14 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     letter-spacing: 0.18em;
-    color: #6c7585;
+    color: var(--text-muted);
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
   }
-  .tab-btn:hover { color: #a4afbb; }
+  .tab-btn:hover { color: var(--text-secondary); }
   .tab-active {
-    background: rgba(82, 116, 144, 0.12);
-    color: #527490;
+    background: var(--accent-primary-glow);
+    color: var(--accent-primary);
   }
 
   /* User filter */
@@ -906,21 +906,21 @@
   }
   .filter-btn {
     padding: 0.35rem 0.65rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 3rem;
     background: transparent;
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.12em;
-    color: #6c7585;
+    color: var(--text-muted);
     cursor: pointer;
     transition: background 0.2s, color 0.2s, border-color 0.2s;
   }
-  .filter-btn:hover { color: #a4afbb; border-color: rgba(255, 255, 255, 0.12); }
+  .filter-btn:hover { color: var(--text-secondary); border-color: var(--border-default); }
   .filter-active {
-    background: rgba(82, 116, 144, 0.1);
-    color: #527490;
-    border-color: rgba(82, 116, 144, 0.2);
+    background: var(--accent-primary-glow);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary-dim);
   }
 
   /* User list */
@@ -935,8 +935,8 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.65rem 0.875rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
   }
   .user-main {
@@ -948,7 +948,7 @@
   .user-email {
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
-    color: #e4e4e7;
+    color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -966,18 +966,18 @@
     font-size: 0.62rem;
     letter-spacing: 0.1em;
   }
-  .status-active { background: rgba(100, 180, 100, 0.15); color: #64b464; }
-  .status-pending { background: rgba(200, 180, 80, 0.15); color: #c8b450; }
-  .status-rejected { background: rgba(196, 112, 112, 0.15); color: #c47070; }
+  .status-active { background: var(--state-success-bg); color: var(--state-success); }
+  .status-pending { background: var(--state-warning-bg); color: var(--state-warning); }
+  .status-rejected { background: var(--state-error-bg); color: var(--state-error); }
   .role-badge {
     padding: 0.1rem 0.4rem;
     border-radius: 3rem;
-    background: rgba(82, 116, 144, 0.15);
-    color: #527490;
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
     font-size: 0.62rem;
     letter-spacing: 0.1em;
   }
-  .user-date { color: #525a66; }
+  .user-date { color: var(--text-muted); }
   .user-actions {
     display: flex;
     gap: 0.3rem;
@@ -987,7 +987,7 @@
     width: 1.75rem;
     height: 1.75rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     background: transparent;
     font-size: 0.7rem;
     display: flex;
@@ -998,10 +998,10 @@
   }
   .btn-small:active { transform: scale(0.88); }
   .btn-small:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-approve { color: #64b464; }
-  .btn-approve:hover { background: rgba(100, 180, 100, 0.15); }
-  .btn-reject { color: #c47070; }
-  .btn-reject:hover { background: rgba(196, 112, 112, 0.15); }
+  .btn-approve { color: var(--state-success); }
+  .btn-approve:hover { background: var(--state-success-bg); }
+  .btn-reject { color: var(--state-error); }
+  .btn-reject:hover { background: var(--state-error-bg); }
 
   /* User row wrapper + uses editing */
   .user-row-wrap {
@@ -1011,7 +1011,7 @@
   }
 
   .user-item-editing {
-    border-color: rgba(82, 116, 144, 0.25);
+    border-color: var(--accent-primary-border);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
@@ -1019,22 +1019,22 @@
   .uses-badge {
     padding: 0.1rem 0.4rem;
     border-radius: 3rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: #8b96a6;
+    background: var(--surface-well-glass);
+    color: var(--text-secondary);
     font-size: 0.62rem;
     letter-spacing: 0.08em;
     font-family: 'DM Mono', monospace;
   }
 
   .uses-zero {
-    background: rgba(200, 168, 75, 0.12);
-    color: #c8a84b;
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
   }
 
   .uses-edit-form {
     padding: 0.75rem;
-    background: rgba(82, 116, 144, 0.06);
-    border: 1px solid rgba(82, 116, 144, 0.15);
+    background: var(--accent-primary-glow);
+    border: 1px solid var(--accent-primary-dim);
     border-top: none;
     border-bottom-left-radius: 0.75rem;
     border-bottom-right-radius: 0.75rem;
@@ -1051,12 +1051,12 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.14em;
-    color: #527490;
+    color: var(--accent-primary);
     user-select: none;
   }
 
   .uses-unlimited-label input[type='checkbox'] {
-    accent-color: #527490;
+    accent-color: var(--accent-primary);
     width: 0.9rem;
     height: 0.9rem;
     cursor: pointer;
@@ -1069,8 +1069,8 @@
   /* Code type toggle */
   .type-toggle {
     display: flex;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 3rem;
     padding: 0.2rem;
   }
@@ -1083,12 +1083,12 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     letter-spacing: 0.14em;
-    color: #6c7585;
+    color: var(--text-muted);
     cursor: pointer;
     transition: background 0.18s, color 0.18s;
   }
-  .type-opt:hover { color: #a4afbb; }
-  .type-opt-active { background: rgba(82, 116, 144, 0.15); color: #527490; }
+  .type-opt:hover { color: var(--text-secondary); }
+  .type-opt-active { background: var(--accent-primary-dim); color: var(--accent-primary); }
 
   /* Code type badge in list */
   .type-badge {
@@ -1098,18 +1098,18 @@
     letter-spacing: 0.1em;
     font-family: 'DM Mono', monospace;
   }
-  .type-reg { background: rgba(82, 116, 144, 0.15); color: #527490; }
-  .type-access { background: rgba(160, 140, 200, 0.15); color: #a08cc8; }
+  .type-reg { background: var(--accent-primary-dim); color: var(--accent-primary); }
+  .type-access { background: var(--badge-purple-bg); color: var(--badge-purple); }
 
   /* Inline code edit form */
   .code-editing {
-    border-color: rgba(82, 116, 144, 0.25);
+    border-color: var(--accent-primary-border);
   }
 
   .edit-form {
     padding: 0.75rem;
-    background: rgba(123, 156, 191, 0.06);
-    border: 1px solid rgba(123, 156, 191, 0.15);
+    background: var(--accent-primary-glow);
+    border: 1px solid var(--accent-primary-dim);
     border-radius: 0.75rem;
     display: flex;
     flex-direction: column;
@@ -1139,35 +1139,35 @@
     padding: 0.5rem 0;
     border: none;
     border-radius: 0.6rem;
-    background: rgba(82, 116, 144, 0.18);
-    color: #527490;
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.14em;
     cursor: pointer;
     transition: background 0.18s, color 0.18s;
   }
-  .btn-edit-save:hover:not(:disabled) { background: rgba(123, 156, 191, 0.28); color: #a8c4df; }
+  .btn-edit-save:hover:not(:disabled) { background: var(--accent-primary-glow); color: var(--accent-primary-hover); }
   .btn-edit-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-edit-cancel {
     padding: 0.5rem 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.6rem;
     background: transparent;
-    color: #6c7585;
+    color: var(--text-muted);
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.14em;
     cursor: pointer;
     transition: background 0.18s, color 0.18s;
   }
-  .btn-edit-cancel:hover { background: rgba(255, 255, 255, 0.04); color: #a4afbb; }
+  .btn-edit-cancel:hover { background: var(--surface-hover); color: var(--text-secondary); }
 
   .edit-error {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: #c47070;
+    color: var(--state-error);
     margin: 0;
   }
 </style>

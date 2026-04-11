@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { rekeyVault, unlockVault, deleteVault } from '../lib/api.js';
   import {
     exportMasterKey, deriveKeyFromPRF, deriveKeyFromRecovery,
@@ -276,7 +276,7 @@
       </div>
 
       <div class="reset-warning">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c47070" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--state-error)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
         <p>This <strong>permanently deletes</strong> your vault and all saved images. They cannot be recovered.</p>
@@ -302,7 +302,7 @@
 <style>
   .backdrop {
     position: fixed; inset: 0; z-index: 110;
-    background: rgba(0, 0, 0, 0.78);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(8px);
     display: flex; align-items: flex-end; justify-content: center;
     animation: fade-in 0.22s ease both;
@@ -314,8 +314,8 @@
 
   .panel {
     width: 100%; max-width: 400px;
-    background: rgba(14, 14, 18, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.75rem 1.75rem;
     backdrop-filter: blur(24px);
@@ -337,7 +337,7 @@
 
   .handle {
     width: 2.5rem; height: 3px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center; margin: 1rem 0 0.5rem; flex-shrink: 0;
   }
   @media (min-width: 480px) { .handle { display: none; } }
@@ -348,16 +348,16 @@
   }
   .title {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.22em; color: #527490;
+    font-size: 0.65rem; letter-spacing: 0.22em; color: var(--accent-primary);
   }
   .close-btn {
     width: 2rem; height: 2rem; border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: #a4afbb; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: transform 0.12s, background 0.2s, color 0.2s;
   }
-  .close-btn:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .close-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
   .close-btn:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .methods-status {
@@ -367,15 +367,15 @@
   .status-row {
     display: flex; align-items: center; gap: 0.75rem;
     padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
   }
-  .status-row svg { color: #6c7585; flex-shrink: 0; }
+  .status-row svg { color: var(--text-muted); flex-shrink: 0; }
   .row-unavailable { opacity: 0.45; }
   .status-label {
     font-family: 'Syne', sans-serif; font-size: 0.82rem; font-weight: 600;
-    color: #a4afbb; flex: 1;
+    color: var(--text-secondary); flex: 1;
   }
   .status-badge {
     font-family: 'DM Mono', monospace; font-size: 0.68rem;
@@ -383,12 +383,12 @@
     border-radius: 3rem;
   }
   .status-badge.enabled {
-    background: rgba(123, 191, 140, 0.12); color: #7bbf8c;
-    border: 1px solid rgba(123, 191, 140, 0.2);
+    background: var(--state-success-bg); color: var(--state-success);
+    border: 1px solid var(--state-success-bg);
   }
   .status-badge.disabled {
-    background: rgba(255, 255, 255, 0.04); color: #8b96a6;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover); color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
   }
 
   .status-block {
@@ -401,104 +401,104 @@
 
   .hint {
     font-family: 'DM Mono', monospace;
-    font-size: 0.75rem; color: #8b96a6; line-height: 1.6; margin: 0;
+    font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; margin: 0;
   }
 
   .btn-primary {
     padding: 0.8rem; border: none; border-radius: 3rem;
-    background: #527490; color: #09090b;
+    background: var(--accent-primary); color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
     cursor: pointer; transition: transform 0.12s, filter 0.12s, background 0.2s;
   }
-  .btn-primary:hover:not(:disabled) { background: #7d9db6; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-primary-hover); }
   .btn-primary:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070; font-size: 0.75rem; margin: 0;
+    color: var(--state-error); font-size: 0.75rem; margin: 0;
   }
 
   .success {
     font-family: 'DM Mono', monospace;
-    color: #7bbf8c; font-size: 0.75rem; margin: 0;
+    color: var(--state-success); font-size: 0.75rem; margin: 0;
   }
 
   .settings-link {
     background: none; border: none;
     font-family: 'DM Mono', monospace;
-    font-size: 0.75rem; color: #8b96a6; letter-spacing: 0.05em;
+    font-size: 0.75rem; color: var(--text-secondary); letter-spacing: 0.05em;
     cursor: pointer; padding: 0.25rem 0; text-align: center;
     transition: color 0.2s;
   }
-  .settings-link:hover { color: #b4bec9; }
-  .settings-link.danger:hover { color: #c47070; }
+  .settings-link:hover { color: var(--text-primary); }
+  .settings-link.danger:hover { color: var(--state-error); }
 
   .pw-form { display: flex; flex-direction: column; gap: 0.875rem; }
 
   .field { display: flex; flex-direction: column; }
   .field input, .field textarea {
     padding: 0.72rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: #e4e4e7; font-family: 'DM Mono', monospace; font-size: 0.85rem;
+    background: var(--surface-well-glass);
+    color: var(--text-primary); font-family: 'DM Mono', monospace; font-size: 0.85rem;
     outline: none; transition: border-color 0.2s; resize: none;
   }
-  .field input::placeholder, .field textarea::placeholder { color: #6c7585; }
-  .field input:focus, .field textarea:focus { border-color: rgba(82, 116, 144, 0.4); }
+  .field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
+  .field input:focus, .field textarea:focus { border-color: var(--border-focus); }
 
   .field-label {
     font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; color: #8b96a6; letter-spacing: 0.18em;
+    font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.18em;
     margin-bottom: 0.35rem; display: block;
   }
-  .field-label strong { color: #c47070; }
+  .field-label strong { color: var(--state-error); }
 
   .or-divider {
     display: flex; align-items: center; gap: 0.75rem;
     margin: 0.25rem 0;
   }
-  .or-line { flex: 1; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .or-line { flex: 1; height: 1px; background: var(--border-subtle); }
   .or-text {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; color: #525a66; letter-spacing: 0.15em;
+    font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.15em;
   }
 
   .file-upload {
     display: flex; align-items: center; justify-content: center;
     padding: 0.72rem 1rem;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border: 1px dashed var(--border-default);
     border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.02);
-    color: #6c7585; font-family: 'DM Mono', monospace; font-size: 0.78rem;
+    background: var(--surface-hover);
+    color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 0.78rem;
     cursor: pointer; transition: border-color 0.2s, color 0.2s;
   }
-  .file-upload:hover { border-color: rgba(82, 116, 144, 0.3); color: #8b96a6; }
-  .file-upload.has-file { color: #527490; border-color: rgba(82, 116, 144, 0.3); }
+  .file-upload:hover { border-color: var(--accent-primary-border); color: var(--text-secondary); }
+  .file-upload.has-file { color: var(--accent-primary); border-color: var(--accent-primary-border); }
 
   .reset-warning {
     display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
     text-align: center; padding: 0.75rem;
-    border: 1px solid rgba(196, 112, 112, 0.2);
+    border: 1px solid var(--state-error-border);
     border-radius: 0.75rem;
-    background: rgba(196, 112, 112, 0.06);
+    background: var(--state-error-bg);
   }
   .reset-warning p {
     font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; color: #a4afbb; margin: 0; line-height: 1.5;
+    font-size: 0.72rem; color: var(--text-secondary); margin: 0; line-height: 1.5;
   }
-  .reset-warning strong { color: #e4e4e7; }
+  .reset-warning strong { color: var(--text-primary); }
 
   .btn-danger {
     padding: 0.8rem; border: none; border-radius: 3rem;
-    background: #943b3b; color: #e4e4e7;
+    background: var(--state-error-strong); color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
     cursor: pointer; transition: transform 0.12s, filter 0.12s, background 0.2s;
   }
-  .btn-danger:hover:not(:disabled) { background: #b04848; }
+  .btn-danger:hover:not(:disabled) { background: var(--state-error-strong-hover); }
   .btn-danger:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
 

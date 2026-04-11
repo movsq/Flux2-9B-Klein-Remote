@@ -103,7 +103,7 @@
     position: fixed;
     inset: 0;
     z-index: 120;
-    background: rgba(0, 0, 0, 0.82);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: flex-end;
@@ -118,8 +118,8 @@
   .panel {
     width: 100%;
     max-width: 440px;
-    background: rgba(14, 14, 18, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.75rem 1.75rem;
     backdrop-filter: blur(24px);
@@ -147,7 +147,7 @@
 
   .handle {
     width: 2.5rem; height: 3px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center; margin: 1rem 0 0.5rem; flex-shrink: 0;
   }
   @media (min-width: 480px) { .handle { display: none; } }
@@ -158,7 +158,7 @@
   }
   .title {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.22em; color: #527490;
+    font-size: 0.65rem; letter-spacing: 0.22em; color: var(--accent-primary);
   }
 
   .lang-toggle {
@@ -166,32 +166,32 @@
   }
   .lang-sep {
     font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; color: rgba(255,255,255,0.15);
+    font-size: 0.6rem; color: var(--border-subtle);
   }
   .lang-btn {
     background: none; border: none; padding: 0.1rem 0.2rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem; letter-spacing: 0.12em;
-    color: rgba(255,255,255,0.3);
+    color: var(--text-muted);
     cursor: pointer;
     transition: color 0.15s;
   }
-  .lang-btn:hover { color: rgba(255,255,255,0.6); }
-  .lang-btn.active { color: #527490; }
+  .lang-btn:hover { color: var(--text-secondary); }
+  .lang-btn.active { color: var(--accent-primary); }
 
   .terms-scroll {
     overflow-y: auto;
     max-height: 50dvh;
     padding-right: 0.5rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(82, 116, 144, 0.25) transparent;
+    scrollbar-color: var(--accent-primary-dim) transparent;
   }
 
   .terms-scroll :global(.section-heading) {
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem; font-weight: 600;
     letter-spacing: 0.06em;
-    color: #c2ccd5;
+    color: var(--text-secondary);
     margin: 1rem 0 0.25rem;
   }
   .terms-scroll :global(.section-heading:first-child) { margin-top: 0; }
@@ -199,14 +199,14 @@
   .terms-text,
   .terms-scroll :global(.terms-text) {
     font-family: 'DM Mono', monospace;
-    font-size: 0.68rem; color: #8b96a6;
+    font-size: 0.68rem; color: var(--text-secondary);
     line-height: 1.65; margin: 0 0 0.25rem;
   }
-  .terms-scroll :global(.terms-text strong) { color: #c2ccd5; }
+  .terms-scroll :global(.terms-text strong) { color: var(--text-secondary); }
 
   .error {
     font-family: 'DM Mono', monospace;
-    font-size: 0.7rem; color: #d97a5a; margin: 0;
+    font-size: 0.7rem; color: var(--state-warning); margin: 0;
     text-align: center;
   }
 
@@ -217,26 +217,26 @@
 
   .btn-primary {
     padding: 0.8rem; border: none; border-radius: 3rem;
-    background: #527490; color: #09090b;
+    background: var(--accent-primary); color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
     cursor: pointer;
     transition: transform 0.12s, filter 0.12s, background 0.2s;
   }
-  .btn-primary:hover:not(:disabled) { background: #7d9db6; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-primary-hover); }
   .btn-primary:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-secondary {
     padding: 0.65rem 0.875rem;
-    background: rgba(255, 255, 255, 0.06); color: #c2ccd5;
-    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 3rem;
+    background: var(--surface-well-glass); color: var(--text-secondary);
+    border: 1px solid var(--border-default); border-radius: 3rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem; letter-spacing: 0.08em;
     cursor: pointer; text-align: center;
     transition: transform 0.12s, background 0.2s, color 0.2s;
   }
-  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .btn-secondary:hover { background: var(--surface-active); color: var(--text-primary); }
   .btn-secondary:active { transform: scale(0.95); }
   .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

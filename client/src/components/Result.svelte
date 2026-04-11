@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { onDestroy } from 'svelte';
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
   import { encryptBlob, bufToB64 } from '../lib/vault-crypto.js';
@@ -258,7 +258,7 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.8);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
@@ -267,7 +267,6 @@
     animation: fade-in 0.18s ease;
   }
 
-  /* Ghost ("behind" stack entry): no dimming, no pointer events, peeking visual */
   .backdrop.ghost {
     background: transparent;
     backdrop-filter: none;
@@ -308,8 +307,8 @@
     width: 100%;
     max-width: 520px;
     max-height: calc(100dvh - 2rem);
-    background: rgba(12, 12, 16, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem;
     user-select: none;
     -webkit-user-select: none;
@@ -347,9 +346,9 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: #a4afbb;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-well-glass);
+    color: var(--text-secondary);
     font-size: 0.75rem;
     display: flex;
     align-items: center;
@@ -360,8 +359,8 @@
   }
 
   .close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #e4e4e7;
+    background: var(--surface-hover);
+    color: var(--text-primary);
   }
 
   .close-btn:active {
@@ -374,13 +373,13 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.22em;
-    color: #527490;
+    color: var(--accent-primary);
     font-weight: 400;
   }
 
   .status {
     font-family: 'DM Mono', monospace;
-    color: #527490;
+    color: var(--accent-primary);
     font-size: 0.8rem;
     margin: 0;
     letter-spacing: 0.08em;
@@ -388,7 +387,7 @@
 
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.78rem;
     margin: 0;
   }
@@ -399,21 +398,18 @@
     object-fit: contain;
     display: block;
     border-radius: 0.875rem;
-    /* Allow iOS native save-photo long-press */
     -webkit-touch-callout: default;
     user-select: none;
     -webkit-user-select: none;
     pointer-events: auto;
   }
 
-  /* ── Image wrapper with overlay ────────────────────────────────────── */
   .image-wrap {
     position: relative;
     flex: 1;
     min-height: 0;
     border-radius: 0.875rem;
     overflow: hidden;
-    /* Override .modal user-select so the iOS save-photo long-press works on the image */
     user-select: auto;
     -webkit-user-select: auto;
     -webkit-touch-callout: default;
@@ -429,7 +425,6 @@
     border-radius: 0.875rem;
   }
 
-  /* Download button — top right corner */
   .overlay-download {
     position: absolute;
     top: 0.6rem;
@@ -437,7 +432,6 @@
     pointer-events: auto;
   }
 
-  /* Action bar below the image */
   .action-bar {
     display: flex;
     align-items: center;
@@ -446,7 +440,6 @@
     flex-shrink: 0;
   }
 
-  /* Shared pill style */
   .overlay-pill {
     display: inline-flex;
     align-items: center;
@@ -460,9 +453,9 @@
     letter-spacing: 0.08em;
     font-weight: 500;
     cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(9, 9, 11, 0.72);
-    color: #c2ccd5;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-raised-glass);
+    color: var(--text-primary);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     transition: background 0.15s, border-color 0.15s, transform 0.1s, color 0.15s;
@@ -474,9 +467,9 @@
   }
 
   .overlay-pill:hover {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.28);
-    color: #eef3f8;
+    background: var(--surface-active);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
   }
 
   .overlay-pill:active {
@@ -492,9 +485,9 @@
   .overlay-download {
     padding: 0.5rem;
     border-radius: 50%;
-    background: rgba(9, 9, 11, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #c2ccd5;
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
@@ -510,8 +503,8 @@
   }
 
   .overlay-download:hover {
-    background: rgba(82, 116, 144, 0.55);
-    color: #eef3f8;
+    background: var(--accent-primary-dim);
+    color: var(--text-primary);
   }
 
   .overlay-download:active { transform: scale(0.88); }
@@ -519,39 +512,39 @@
   .overlay-pill-save {
     background: rgba(82, 116, 144, 0.65);
     border-color: rgba(82, 116, 144, 0.55);
-    color: #d8e8f3;
+    color: var(--text-primary);
   }
 
   .overlay-pill-save:hover {
     background: rgba(82, 116, 144, 0.88);
-    border-color: rgba(125, 157, 182, 0.7);
-    color: #eef3f8;
+    border-color: var(--accent-primary-hover);
+    color: var(--text-primary);
   }
 
   .overlay-pill-saved {
-    background: rgba(82, 116, 144, 0.22);
-    border-color: rgba(82, 116, 144, 0.3);
-    color: #7db6a0;
+    background: var(--accent-primary-dim);
+    border-color: var(--accent-primary-border);
+    color: var(--state-success);
     cursor: default;
   }
 
   .overlay-pill-pending {
-    background: rgba(82, 116, 144, 0.18);
-    border-color: rgba(82, 116, 144, 0.22);
-    color: #527490;
+    background: var(--accent-primary-glow);
+    border-color: var(--accent-primary-dim);
+    color: var(--accent-primary);
     opacity: 0.8;
     cursor: default;
   }
 
   .overlay-pill-discard {
-    color: #c47070;
-    border-color: rgba(196, 112, 112, 0.35);
+    color: var(--state-error);
+    border-color: var(--state-error-border);
   }
 
   .overlay-pill-discard:hover {
-    background: rgba(196, 112, 112, 0.28);
-    border-color: rgba(196, 112, 112, 0.6);
-    color: #e07070;
+    background: var(--state-error-bg);
+    border-color: var(--state-error);
+    color: var(--state-error);
   }
 
   .overlay-chevron {
@@ -569,7 +562,6 @@
     position: relative;
   }
 
-  /* ── Use-as-input picker ─────────────────────────────────────────────── */
   .use-input-wrap {
     position: relative;
     flex: 0 0 auto;
@@ -587,9 +579,9 @@
     gap: 0.35rem;
     padding: 0.4rem;
     border-radius: 0.75rem;
-    background: rgba(9, 9, 11, 0.94);
-    border: 1px solid rgba(82, 116, 144, 0.4);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    background: var(--surface-overlay-glass);
+    border: 1px solid var(--accent-primary-border);
+    box-shadow: 0 8px 24px var(--shadow-panel);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     z-index: 10;
@@ -597,9 +589,9 @@
   }
 
   .picker-btn {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
-    color: #d1dae3;
+    border: 1px solid var(--border-default);
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     border-radius: 0.5rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.66rem;
@@ -610,9 +602,9 @@
   }
 
   .picker-btn:hover {
-    background: rgba(82, 116, 144, 0.28);
-    border-color: rgba(82, 116, 144, 0.52);
-    color: #eef3f8;
+    background: var(--accent-primary-dim);
+    border-color: var(--accent-primary-border);
+    color: var(--text-primary);
   }
 
   .picker-btn:disabled {
@@ -622,7 +614,7 @@
 
   .save-error {
     font-family: 'DM Mono', monospace;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.7rem;
     margin: 0;
     text-align: center;

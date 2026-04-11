@@ -951,8 +951,8 @@
   .card {
     width: 100%;
     max-width: 440px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     border-radius: 1.25rem;
     padding: 1.75rem;
     backdrop-filter: blur(12px);
@@ -960,7 +960,7 @@
   }
 
   .card.card-drag {
-    border-color: rgba(82, 116, 144, 0.35);
+    border-color: var(--accent-primary-border);
   }
 
   /* ── Form ──────────────────────────────────────────────────────────── */
@@ -970,12 +970,6 @@
     gap: 1.1rem;
   }
 
-  /* ────────────────────────────────────────────────────────────────────
-     Entrance animation tokens — adjust --el-opacity per element to
-     control its final translucency. fill-mode: backwards means the
-     element is hidden during its delay then reverts to the natural
-     opacity below once the animation completes (no permanent override).
-  ──────────────────────────────────────────────────────────────────── */
   @keyframes constructIn {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -1010,9 +1004,9 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(9, 9, 11, 0.92);
-    color: #8b96a6;
+    border: 1px solid var(--border-default);
+    background: var(--surface-raised-glass);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1021,23 +1015,23 @@
     flex-shrink: 0;
   }
 
-  .btn-admin:hover { background: rgba(18, 24, 36, 0.96); border-color: rgba(82, 116, 144, 0.4); color: #527490; }
+  .btn-admin:hover { background: var(--surface-raised-glass); border-color: var(--accent-primary-border); color: var(--accent-primary); }
   .btn-admin:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .form-title {
     font-family: 'Syne', sans-serif;
     font-size: 1.6rem;
     font-weight: 800;
-    color: #d4d4d8;
+    color: var(--text-primary);
     letter-spacing: -0.02em;
     line-height: 1;
   }
 
   .form-sub {
     font-family: 'DM Mono', monospace;
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     letter-spacing: 0.2em;
-    color: #527490;
+    color: var(--accent-primary);
   }
 
   /* ── Field label ───────────────────────────────────────────────────── */
@@ -1046,7 +1040,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.18em;
-    color: #8b96a6;
+    color: var(--text-secondary);
     margin-bottom: 0.35rem;
   }
 
@@ -1085,21 +1079,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border: 1px dashed var(--border-default);
     border-radius: 0.75rem;
     height: 180px;
-    background-color: rgba(9, 9, 11, 0.92);
+    background-color: var(--surface-raised-glass);
     background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 48px 48px;
     background-attachment: fixed;
   }
 
   .img-label:hover .drop-zone {
-    border-color: rgba(82, 116, 144, 0.4);
-    color: #527490;
-    background-color: rgba(82, 116, 144, 0.06);
+    border-color: var(--accent-primary-border);
+    color: var(--accent-primary);
+    background-color: var(--accent-primary-glow);
   }
 
   .img-preview-wrap {
@@ -1112,9 +1106,9 @@
     width: 100%;
     height: 180px;
     object-fit: contain;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--surface-active);
     border-radius: 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     display: block;
     pointer-events: none;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -1126,8 +1120,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(9, 9, 11, 0.65);
-    color: #527490;
+    background: var(--surface-raised-glass);
+    color: var(--accent-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     letter-spacing: 0.18em;
@@ -1140,20 +1134,20 @@
     pointer-events: none;
     font-family: 'DM Mono', monospace;
     font-size: 0.85rem;
-    color: #6c7585;
+    color: var(--text-muted);
     letter-spacing: 0.04em;
   }
 
   .drag-target .drop-zone {
-    border-color: rgba(82, 116, 144, 0.6);
-    color: #527490;
-    background: rgba(82, 116, 144, 0.06);
-    box-shadow: 0 0 0 3px rgba(82, 116, 144, 0.12);
+    border-color: var(--border-focus);
+    color: var(--accent-primary);
+    background: var(--accent-primary-glow);
+    box-shadow: 0 0 0 3px var(--accent-primary-glow);
   }
 
   .drag-target .img-preview {
-    border-color: rgba(82, 116, 144, 0.5);
-    box-shadow: 0 0 0 3px rgba(82, 116, 144, 0.12);
+    border-color: var(--accent-primary-border);
+    box-shadow: 0 0 0 3px var(--accent-primary-glow);
   }
 
   .hidden-input { display: none; }
@@ -1170,10 +1164,10 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.3rem 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-default);
     border-radius: 3rem;
-    background: rgba(255, 255, 255, 0.04);
-    color: #8b96a6;
+    background: var(--surface-hover);
+    color: var(--text-secondary);
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.1em;
@@ -1181,16 +1175,16 @@
     transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.12s ease;
   }
 
-  .btn-swap:hover { color: #527490; border-color: rgba(82, 116, 144, 0.35); background: rgba(82, 116, 144, 0.05); }
+  .btn-swap:hover { color: var(--accent-primary); border-color: var(--accent-primary-border); background: var(--accent-primary-glow); }
   .btn-swap:active { transform: scale(0.93); }
 
   .btn-clear {
     margin-top: 0.3rem;
     padding: 0.25rem 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.375rem;
     background: transparent;
-    color: #8b96a6;
+    color: var(--text-secondary);
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     cursor: pointer;
@@ -1199,21 +1193,21 @@
     transition: color 0.2s, border-color 0.2s, transform 0.12s ease, filter 0.12s ease;
   }
 
-  .btn-clear:hover { color: #c47070; border-color: rgba(196, 112, 112, 0.4); }
+  .btn-clear:hover { color: var(--state-error); border-color: var(--state-error-border); }
   .btn-clear:active { transform: scale(0.93); filter: brightness(0.85); }
 
   /* ── Inputs / textarea ──────────────────────────────────────────────── */
   textarea {
     padding: 0.65rem 0.875rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    background-color: rgba(9, 9, 11, 0.92);
+    background-color: var(--surface-raised-glass);
     background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 48px 48px;
     background-attachment: fixed;
-    color: #e4e4e7;
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.85rem;
     outline: none;
@@ -1223,10 +1217,10 @@
 
   input[type='number'] {
     padding: 0.65rem 0.875rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #e4e4e7;
+    background-color: var(--surface-well-glass);
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.85rem;
     outline: none;
@@ -1254,10 +1248,10 @@
   }
 
   textarea::placeholder,
-  input::placeholder { color: #6c7585; }
+  input::placeholder { color: var(--text-muted); }
 
   textarea:focus,
-  input[type='number']:focus { border-color: rgba(82, 116, 144, 0.4); }
+  input[type='number']:focus { border-color: var(--border-focus); }
 
   textarea:disabled,
   input:disabled { opacity: 0.45; }
@@ -1280,10 +1274,10 @@
   .select-trigger {
     width: 100%;
     padding: 0.65rem 0.875rem;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: var(--surface-well-glass);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
-    color: #e4e4e7;
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 0.82rem;
     cursor: pointer;
@@ -1294,14 +1288,14 @@
     transition: border-color 0.2s, transform 0.12s ease, filter 0.12s ease;
   }
 
-  .select-trigger:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.18); background-color: rgba(255, 255, 255, 0.09); }
+  .select-trigger:hover:not(:disabled) { border-color: var(--border-strong); background-color: var(--surface-hover); }
   .select-trigger:active:not(:disabled) { transform: scale(0.98); filter: brightness(0.9); }
   .select-trigger:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .chevron {
     display: flex;
     align-items: center;
-    color: #8b96a6;
+    color: var(--text-secondary);
     transition: transform 0.22s ease;
     flex-shrink: 0;
   }
@@ -1320,8 +1314,8 @@
     top: calc(100% + 5px);
     left: 0;
     right: 0;
-    background: rgba(12, 12, 15, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-overlay-glass);
+    border: 1px solid var(--border-default);
     border-radius: 0.75rem;
     overflow: hidden;
     z-index: 60;
@@ -1343,7 +1337,7 @@
     padding: 0.6rem 0.875rem;
     background: transparent;
     border: none;
-    color: #a4afbb;
+    color: var(--text-secondary);
     font-family: 'DM Mono', monospace;
     font-size: 0.8rem;
     text-align: left;
@@ -1351,9 +1345,9 @@
     transition: background 0.15s, color 0.15s, transform 0.1s ease;
   }
 
-  .select-option:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+  .select-option:hover { background: var(--surface-hover); color: var(--text-primary); }
   .select-option:active { transform: scale(0.98); }
-  .select-option.active { color: #527490; }
+  .select-option.active { color: var(--accent-primary); }
 
   /* ── Range slider ────────────────────────────────────────────────────── */
   .param-field-slider {
@@ -1383,7 +1377,7 @@
     width: 100%;
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--border-subtle);
     outline: none;
     margin: 0;
     cursor: pointer;
@@ -1394,24 +1388,24 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #527490;
-    border: 2px solid rgba(9, 9, 11, 0.8);
+    background: var(--accent-primary);
+    border: 2px solid var(--surface-base);
     cursor: pointer;
     transition: background 0.2s, transform 0.12s;
   }
-  .range-slider::-webkit-slider-thumb:hover { background: #7d9db6; transform: scale(1.15); }
+  .range-slider::-webkit-slider-thumb:hover { background: var(--accent-primary-hover); transform: scale(1.15); }
   .range-slider::-moz-range-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #527490;
-    border: 2px solid rgba(9, 9, 11, 0.8);
+    background: var(--accent-primary);
+    border: 2px solid var(--surface-base);
     cursor: pointer;
   }
   .range-slider::-moz-range-track {
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--border-subtle);
   }
 
   /* ── Generate row ────────────────────────────────────────────────────── */
@@ -1430,23 +1424,36 @@
     padding: 0.85rem;
     border: none;
     border-radius: 3rem;
-    background: #527490;
-    color: #09090b;
+    background: var(--accent-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+    color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     font-weight: 500;
     letter-spacing: 0.14em;
     cursor: pointer;
-    transition: transform 0.12s ease, filter 0.12s ease, background 0.3s, flex 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.12s ease, transform 0.1s ease, filter 0.12s ease, flex 0.3s ease;
   }
 
-  .btn-generate:hover:not(:disabled) { background: #7d9db6; }
-  .btn-generate:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
+  .btn-generate::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--surface-hover) 0%, transparent 60%);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .btn-generate:hover:not(:disabled) { filter: brightness(1.15); }
+  .btn-generate:active:not(:disabled) { transform: scale(0.97); filter: brightness(0.88); }
   .btn-generate:disabled { opacity: 0.7; cursor: not-allowed; }
   .btn-generate.btn-queue-full:disabled { opacity: 0.42; }
   .btn-generate.btn-processing {
-    background: #3a3f47;
-    color: #8b96a6;
+    background: var(--surface-active);
+    color: var(--text-secondary);
     cursor: not-allowed;
     opacity: 1;
     position: relative;
@@ -1456,7 +1463,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.07) 50%, transparent 75%);
+    background: linear-gradient(90deg, transparent 25%, var(--surface-hover) 50%, transparent 75%);
     background-size: 200% 100%;
     animation: btn-sweep 1.6s linear infinite;
     border-radius: inherit;
@@ -1469,7 +1476,7 @@
   /* ── Error / Code status ─────────────────────────────────────────────── */
   .error {
     font-family: 'DM Mono', monospace;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
@@ -1477,7 +1484,7 @@
 
   .code-depleted {
     font-family: 'DM Mono', monospace;
-    color: #c8a84b;
+    color: var(--state-warning);
     font-size: 0.75rem;
     margin: 0;
     letter-spacing: 0.03em;
@@ -1485,7 +1492,7 @@
 
   .offline-hint {
     font-family: 'DM Mono', monospace;
-    color: #c4996a;
+    color: var(--state-warning);
     font-size: 0.71rem;
     margin: 0;
     letter-spacing: 0.04em;
@@ -1499,13 +1506,13 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.65rem 0.875rem;
-    background-color: rgba(9, 9, 11, 0.84);
+    background-color: var(--surface-raised-glass);
     background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 48px 48px;
     background-attachment: fixed;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
     cursor: pointer;
     transition: border-color 0.2s, background-color 0.2s, transform 0.12s ease, filter 0.12s ease;
@@ -1516,8 +1523,8 @@
   }
 
   .config-row:hover {
-    border-color: rgba(255, 255, 255, 0.16);
-    background-color: rgba(9, 9, 11, 0.7);
+    border-color: var(--border-default);
+    background-color: var(--surface-raised-glass);
   }
   .config-row:active { transform: scale(0.99); filter: brightness(0.9); }
   .config-row:disabled {
@@ -1533,26 +1540,26 @@
   }
 
   .config-icon {
-    color: #8b96a6;
+    color: var(--text-secondary);
     flex-shrink: 0;
     transition: color 0.2s;
   }
-  .config-row:hover .config-icon { color: #527490; }
+  .config-row:hover .config-icon { color: var(--accent-primary); }
 
   .config-label {
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.18em;
-    color: #8b96a6;
+    color: var(--text-secondary);
     transition: color 0.2s;
   }
-  .config-row:hover .config-label { color: #a4afbb; }
+  .config-row:hover .config-label { color: var(--text-secondary); }
 
   .config-summary {
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.05em;
-    color: #6c7585;
+    color: var(--text-muted);
     overflow: hidden;
     flex: 1;
     min-width: 0;
@@ -1560,7 +1567,7 @@
     mask-image: linear-gradient(to left, transparent 0%, black 15%);
     -webkit-mask-image: linear-gradient(to left, transparent 0%, black 15%);
   }
-  .config-row:hover .config-summary { color: #8b96a6; }
+  .config-row:hover .config-summary { color: var(--text-secondary); }
 
   .config-summary-inner {
     display: inline-flex;
@@ -1584,7 +1591,7 @@
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: rgba(0, 0, 0, 0.8);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     display: flex;
@@ -1601,8 +1608,8 @@
   .cfg-panel {
     width: 100%;
     max-width: 440px;
-    background: rgba(14, 14, 18, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-bottom: none;
     border-radius: 1.5rem 1.5rem 0 0;
     padding: 0 1.75rem 1.75rem;
@@ -1626,7 +1633,7 @@
 
     .cfg-panel {
       border-radius: 1.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid var(--border-default);
       max-height: 80vh;
       animation: cfg-panel-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
@@ -1641,7 +1648,7 @@
     width: 3rem;
     height: 3px;
     border-radius: 9999px;
-    background: linear-gradient(90deg, transparent, rgba(82, 116, 144, 0.4), transparent);
+    background: linear-gradient(90deg, transparent, var(--accent-primary-border), transparent);
     align-self: center;
     margin: 1rem 0 0.75rem;
     flex-shrink: 0;
@@ -1656,7 +1663,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.875rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-subtle);
     margin-bottom: 0.25rem;
     flex-shrink: 0;
   }
@@ -1669,17 +1676,17 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
     letter-spacing: 0.26em;
-    color: #7da8c4;
-    text-shadow: 0 0 20px rgba(82, 116, 144, 0.4);
+    color: var(--accent-primary-hover);
+    text-shadow: 0 0 20px var(--accent-primary-glow);
   }
 
   .cfg-close {
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: #181c24;
-    color: #8b96a6;
+    border: 1px solid var(--border-default);
+    background: var(--surface-raised-glass);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1687,7 +1694,7 @@
     transition: transform 0.12s ease, filter 0.12s ease, border-color 0.2s, background 0.2s, color 0.2s;
     flex-shrink: 0;
   }
-  .cfg-close:hover { background: #1f2533; border-color: rgba(82, 116, 144, 0.4); color: #527490; }
+  .cfg-close:hover { background: var(--surface-overlay-glass); border-color: var(--accent-primary-border); color: var(--accent-primary); }
   .cfg-close:active { transform: scale(0.88); filter: brightness(0.85); }
 
   .cfg-body-wrap {
@@ -1705,7 +1712,7 @@
     left: 0;
     right: 0;
     height: 4rem;
-    background: linear-gradient(to bottom, transparent, rgba(14, 14, 18, 0.92));
+    background: linear-gradient(to bottom, transparent, var(--surface-raised-glass));
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
@@ -1723,18 +1730,18 @@
     gap: 0;
     padding-bottom: 0.5rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(82,116,144,0.45) transparent;
+    scrollbar-color: var(--accent-primary-dim) transparent;
   }
   .cfg-body::-webkit-scrollbar { width: 3px; }
   .cfg-body::-webkit-scrollbar-track { background: transparent; }
-  .cfg-body::-webkit-scrollbar-thumb { background: rgba(82,116,144,0.45); border-radius: 2px; }
+  .cfg-body::-webkit-scrollbar-thumb { background: var(--accent-primary-dim); border-radius: 2px; }
 
   .cfg-section {
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
     padding: 1.1rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .cfg-section:last-child {
@@ -1745,7 +1752,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.56rem;
     letter-spacing: 0.24em;
-    color: #527490;
+    color: var(--accent-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1756,41 +1763,42 @@
     display: inline-block;
     width: 12px;
     height: 1px;
-    background: linear-gradient(90deg, #527490, rgba(82, 116, 144, 0.3));
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-primary-border));
     flex-shrink: 0;
   }
 
   .cfg-footer {
     padding-top: 1.1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--border-subtle);
     flex-shrink: 0;
   }
 
   .cfg-done {
+    position: relative;
     width: 100%;
     padding: 0.85rem;
-    border: 1px solid rgba(82, 116, 144, 0.3);
+    border: none;
     border-radius: 3rem;
-    background: linear-gradient(135deg, #3e5f77 0%, #527490 50%, #4a6a84 100%);
-    color: #e8f0f5;
+    background: var(--accent-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+    color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     font-weight: 500;
     letter-spacing: 0.18em;
     cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.12s ease, filter 0.12s ease, border-color 0.2s;
+    transition: background 0.12s ease, transform 0.1s ease, filter 0.12s ease;
   }
   .cfg-done::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+    background: linear-gradient(135deg, var(--surface-hover) 0%, transparent 60%);
     pointer-events: none;
     border-radius: inherit;
   }
-  .cfg-done:hover { filter: brightness(1.15); border-color: rgba(82, 116, 144, 0.5); }
+  .cfg-done:hover { filter: brightness(1.15); border-color: var(--border-focus); }
   .cfg-done:active { transform: scale(0.97); filter: brightness(0.88); }
 
   /* ── Mobile layout ───────────────────────────────────────────────────── */
@@ -1835,7 +1843,7 @@
 
   .trigger-size {
     font-size: 0.75rem;
-    color: #6c7585;
+    color: var(--text-muted);
     padding: 0 0.5rem;
     flex-shrink: 0;
   }
@@ -1847,7 +1855,7 @@
   }
 
   .quant-opt-size {
-    color: #525a66;
+    color: var(--text-muted);
     font-size: 0.76rem;
     padding-left: 0.5rem;
     flex-shrink: 0;
@@ -1856,7 +1864,7 @@
   /* ── Queue panel ─────────────────────────────────────────────────────── */
   .queue-panel {
     margin-top: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.75rem;
     overflow: hidden;
     animation: constructIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -1867,15 +1875,15 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.6rem 0.875rem;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .queue-title {
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.18em;
-    color: #8b96a6;
+    color: var(--text-secondary);
     font-weight: 500;
   }
 
@@ -1889,19 +1897,19 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.1em;
-    color: #527490;
+    color: var(--accent-primary);
     font-weight: 500;
     transition: color 0.2s;
   }
 
   .queue-mine-count.queue-mine-full {
-    color: #c47070;
+    color: var(--state-error);
   }
 
   .queue-total-count {
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
-    color: #525a66;
+    color: var(--text-muted);
     letter-spacing: 0.05em;
   }
 
@@ -1911,18 +1919,18 @@
     max-height: calc(6 * 3.4rem);
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.08) transparent;
+    scrollbar-color: var(--border-subtle) transparent;
   }
 
   .queue-list::-webkit-scrollbar { width: 3px; }
   .queue-list::-webkit-scrollbar-track { background: transparent; }
-  .queue-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  .queue-list::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 2px; }
 
   .queue-item {
     display: flex;
     flex-direction: column;
     padding: 0.55rem 0.875rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border-subtle);
     transition: background 0.2s;
   }
 
@@ -1937,22 +1945,22 @@
   }
 
   .queue-item.queue-mine {
-    background: rgba(82, 116, 144, 0.08);
-    border-left: 2px solid rgba(82, 116, 144, 0.5);
+    background: var(--accent-primary-glow);
+    border-left: 2px solid var(--accent-primary-border);
     padding-left: calc(0.875rem - 2px);
   }
 
   .queue-item.queue-active.queue-mine {
-    background: rgba(82, 116, 144, 0.13);
+    background: var(--accent-primary-dim);
   }
 
   .queue-mine-badge {
     font-family: 'DM Mono', monospace;
     font-size: 0.55rem;
     letter-spacing: 0.15em;
-    color: #527490;
-    background: rgba(82, 116, 144, 0.15);
-    border: 1px solid rgba(82, 116, 144, 0.35);
+    color: var(--accent-primary);
+    background: var(--accent-primary-dim);
+    border: 1px solid var(--accent-primary-border);
     border-radius: 0.25rem;
     padding: 0.08rem 0.3rem;
     flex-shrink: 0;
@@ -1961,7 +1969,7 @@
   .queue-pos {
     font-family: 'DM Mono', monospace;
     font-size: 0.7rem;
-    color: #6c7585;
+    color: var(--text-muted);
     min-width: 1.5rem;
     flex-shrink: 0;
   }
@@ -1970,7 +1978,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.06em;
-    color: #8b96a6;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -1985,7 +1993,7 @@
     flex-shrink: 0;
   }
   .queue-dot.waiting {
-    background: #525a66;
+    background: var(--text-muted);
   }
 
   @keyframes queue-pulse {
@@ -1996,17 +2004,16 @@
   .queue-progress-inline {
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
-    color: #527490;
+    color: var(--accent-primary);
     letter-spacing: 0.06em;
     background: linear-gradient(
       to right,
-      rgba(82, 116, 144, 0.2) var(--progress, 0%),
+      var(--accent-primary-glow) var(--progress, 0%),
       transparent var(--progress, 0%)
     );
     padding: 0.1rem 0.4rem;
     border-radius: 0.25rem;
   }
-
 
   @keyframes queue-sweep {
     0%   { background-position: 200% center; }
@@ -2017,12 +2024,12 @@
     background: linear-gradient(
       90deg,
       transparent 25%,
-      rgba(82, 116, 144, 0.28) 50%,
+      var(--accent-primary-dim) 50%,
       transparent 75%
     );
     background-size: 200% 100%;
     animation: queue-sweep 1.8s linear infinite;
-    color: #527490;
+    color: var(--accent-primary);
     opacity: 0.7;
   }
 
@@ -2037,7 +2044,7 @@
     height: 28px;
     object-fit: cover;
     border-radius: 0.25rem;
-    border: 1px solid rgba(82, 116, 144, 0.22);
+    border: 1px solid var(--accent-primary-border);
     flex-shrink: 0;
     pointer-events: none;
     user-select: none;
@@ -2047,7 +2054,7 @@
   .queue-eta {
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
-    color: #525a66;
+    color: var(--text-muted);
     flex-shrink: 0;
     min-width: 2rem;
     text-align: right;
@@ -2058,9 +2065,9 @@
     height: 1.4rem;
     flex-shrink: 0;
     border-radius: 50%;
-    border: 1px solid rgba(196, 112, 112, 0.45);
-    background: rgba(196, 112, 112, 0.1);
-    color: #c47070;
+    border: 1px solid var(--state-error-border);
+    background: var(--state-error-bg);
+    color: var(--state-error);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2068,7 +2075,7 @@
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
   }
 
-  .queue-cancel:hover { background: rgba(196, 112, 112, 0.25); border-color: rgba(196, 112, 112, 0.7); }
+  .queue-cancel:hover { background: var(--state-error-bg); border-color: var(--state-error); }
   .queue-cancel:active { transform: scale(0.85); }
 
   .queue-prompt-row {
@@ -2089,7 +2096,7 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
     letter-spacing: 0.04em;
-    color: #527490;
+    color: var(--accent-primary);
     opacity: 0.75;
     animation: queue-marquee 14s linear infinite;
   }
@@ -2101,7 +2108,7 @@
 
   /* ── Completed jobs section ─────────────────────────────────────────── */
   .queue-finished-section {
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border-subtle);
   }
 
   .queue-finished-header {
@@ -2109,22 +2116,22 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.4rem 0.875rem;
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .queue-finished-title {
     font-family: 'DM Mono', monospace;
     font-size: 0.58rem;
     letter-spacing: 0.18em;
-    color: #525a66;
+    color: var(--text-muted);
     font-weight: 500;
   }
 
   .queue-finished-count {
     font-family: 'DM Mono', monospace;
     font-size: 0.58rem;
-    color: #525a66;
+    color: var(--text-muted);
     letter-spacing: 0.05em;
   }
 
@@ -2135,7 +2142,7 @@
     padding: 0.45rem 0.875rem;
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
     text-align: left;
     font: inherit;
@@ -2144,7 +2151,7 @@
   }
 
   .queue-finished-item:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-hover);
   }
 
   .queue-finished-item:last-child {
@@ -2152,7 +2159,7 @@
   }
 
   .queue-finished-item:active {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--surface-active);
   }
 
   .queue-finished-thumb {
@@ -2160,7 +2167,7 @@
     height: 26px;
     object-fit: cover;
     border-radius: 0.2rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     flex-shrink: 0;
     pointer-events: none;
     user-select: none;
@@ -2171,8 +2178,8 @@
     width: 26px;
     height: 26px;
     border-radius: 0.2rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface-hover);
+    border: 1px solid var(--border-subtle);
     flex-shrink: 0;
   }
 
@@ -2180,9 +2187,9 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.5rem;
     letter-spacing: 0.15em;
-    color: #527490;
-    background: rgba(82, 116, 144, 0.1);
-    border: 1px solid rgba(82, 116, 144, 0.25);
+    color: var(--accent-primary);
+    background: var(--accent-primary-glow);
+    border: 1px solid var(--accent-primary-border);
     border-radius: 0.2rem;
     padding: 0.05rem 0.28rem;
     flex-shrink: 0;
@@ -2203,14 +2210,14 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.04em;
-    color: #6c7585;
+    color: var(--text-muted);
     animation: queue-marquee 18s linear infinite;
   }
 
   .queue-finished-timer {
     font-family: 'DM Mono', monospace;
     font-size: 0.58rem;
-    color: #c4996a;
+    color: var(--state-warning);
     letter-spacing: 0.08em;
     flex-shrink: 0;
   }

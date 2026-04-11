@@ -18,10 +18,13 @@
   }
 
   // ── State ──────────────────────────────────────────────────────────────────
-  let token = $state(null);
-  let user = $state(null);       // { name, email, status, isAdmin, type }
+  // DEV bypass — Vite sets import.meta.env.DEV=true only during `npm run dev`.
+  // The ternary dead-code-eliminates to the production value in every real build.
+  const _DEV = import.meta.env.DEV;
+  let token = $state(_DEV ? 'dev-token' : null);
+  let user  = $state(_DEV ? { name: 'Dev', email: 'dev@local', status: 'approved', isAdmin: false, type: 'code_user', tosAccepted: true } : null);
   let ws = $state(null);
-  let view = $state('login');        // 'login' | 'submit'
+  let view = $state(_DEV ? 'submit' : 'login');  // 'login' | 'submit'
   // Result stack — index 0 is frontmost (currently shown), others peek behind it
   let resultStack = $state([]); // [{ id, result, aesKey, promptSnippet, imageUrl }]
   // Dismissed results waiting 2 min before auto-expiring
@@ -29,9 +32,9 @@
   // Ticker for countdown displays
   let clockNow = $state(Date.now());
   let wsError = $state('');
-  let wsState = $state('disconnected'); // connected | reconnecting | exhausted | connecting | auth_invalid | disconnected
+  let wsState = $state(_DEV ? 'connected' : 'disconnected'); // connected | reconnecting | exhausted | connecting | auth_invalid | disconnected
   let wsFailedAttempts = $state(0);
-  let wsEverConnected = $state(false);
+  let wsEverConnected = $state(_DEV ? true : false);
   let sessionNotice = $state('');
   let submitInputSetter = null;
   let inputToast = $state('');
@@ -43,7 +46,7 @@
   let showTerms = $state(false);
   let termsViewOnly = $state(false);
   let showDataNotice = $state(false);
-  let tosAccepted = $state(false);
+  let tosAccepted = $state(_DEV ? true : false);
 
   // Queue state
   let queueState = $state({ queue: [], activeJobId: null, avgDuration: 60 });
@@ -681,6 +684,8 @@
 </div>
 
 <style>
+  @import './styles/theme.css';
+
   :global(*, *::before, *::after) {
     box-sizing: border-box;
   }
@@ -693,13 +698,31 @@
   :global(body) {
     margin: 0;
     font-family: 'Syne', system-ui, sans-serif;
-    background: #09090b;
+    background: var(--surface-base);
     background-image:
-      linear-gradient(rgba(123, 156, 191, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(123, 156, 191, 0.07) 1px, transparent 1px);
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 48px 48px;
-    color: #e4e4e7;
+    color: var(--text-primary);
+    line-height: 1.6;
+    letter-spacing: 0.01em;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Global scrollbar styling */
+  :global(::-webkit-scrollbar) {
+    width: 4px;
+    height: 4px;
+  }
+  :global(::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+  :global(::-webkit-scrollbar-thumb) {
+    background: var(--surface-hover);
+    border-radius: 2px;
+  }
+  :global(::-webkit-scrollbar-thumb:hover) {
+    background: var(--surface-active);
   }
 
   .app {
@@ -708,9 +731,9 @@
   }
 
   .ws-banner {
-    background: rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    color: #c4996a;
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--state-warning);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     letter-spacing: 0.06em;
@@ -723,9 +746,9 @@
   }
 
   .ws-retry {
-    border: 1px solid rgba(196, 153, 106, 0.5);
-    background: rgba(196, 153, 106, 0.08);
-    color: #f6d2a8;
+    border: 1px solid var(--state-warning-border);
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.07em;
@@ -735,7 +758,7 @@
   }
 
   .ws-meta {
-    color: rgba(228, 228, 231, 0.7);
+    color: var(--text-secondary);
     font-size: 0.64rem;
   }
 
@@ -746,19 +769,19 @@
     transform: translateX(-50%);
     padding: 0.6rem 1.15rem;
     border-radius: 999px;
-    border: 1px solid rgba(125, 168, 196, 0.28);
-    background: rgba(12, 18, 28, 0.52);
+    border: 1px solid var(--accent-primary-border);
+    background: var(--surface-overlay-glass);
     backdrop-filter: blur(28px) saturate(1.4);
     -webkit-backdrop-filter: blur(28px) saturate(1.4);
-    color: #c8dde9;
+    color: var(--text-secondary);
     font-family: 'DM Mono', monospace;
     font-size: 0.68rem;
     letter-spacing: 0.1em;
     z-index: 220;
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.45),
-      0 1px 0 rgba(255, 255, 255, 0.1) inset,
-      0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+      0 8px 32px var(--shadow-panel),
+      0 1px 0 var(--border-subtle) inset,
+      0 0 0 1px var(--surface-hover) inset;
     pointer-events: none;
     white-space: nowrap;
     animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -780,9 +803,9 @@
     justify-content: center;
     gap: 0.5rem;
     padding: 0.3rem 1rem;
-    background: rgba(9, 9, 11, 0.72);
+    background: var(--surface-raised-glass);
     backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--border-subtle);
   }
 
   .footer-btn {
@@ -792,17 +815,17 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     letter-spacing: 0.06em;
-    color: rgba(255, 255, 255, 0.25);
+    color: var(--text-muted);
     cursor: pointer;
     transition: color 0.15s;
     line-height: 1;
   }
-  .footer-btn:hover { color: rgba(255, 255, 255, 0.5); }
+  .footer-btn:hover { color: var(--text-secondary); }
 
   .footer-divider {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.1);
+    color: var(--border-subtle);
     line-height: 1;
     user-select: none;
   }

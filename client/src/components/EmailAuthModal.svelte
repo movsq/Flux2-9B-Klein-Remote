@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { registerEmail, loginEmail, acceptTos } from '../lib/api.js';
   import TermsModal from './TermsModal.svelte';
   import DataNoticeModal from './DataNoticeModal.svelte';
@@ -204,8 +204,8 @@
     {:else if regSuccess}
       <div class="pending-state">
         <svg class="pending-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="#527490" stroke-width="1.5"/>
-          <path d="M12 7v5l3 3" stroke="#527490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="10" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <path d="M12 7v5l3 3" stroke="var(--accent-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <p class="pending-text">Registration submitted. Your account is pending admin approval.</p>
         <button class="btn-secondary" type="button" onclick={onClose}>CLOSE</button>
@@ -330,7 +330,7 @@
     position: fixed;
     inset: 0;
     z-index: 120;
-    background: rgba(0, 0, 0, 0.82);
+    background: var(--surface-backdrop);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: flex-end;
@@ -345,8 +345,8 @@
   .panel {
     width: 100%;
     max-width: 400px;
-    background: rgba(14, 14, 18, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface-raised-glass);
+    border: 1px solid var(--border-default);
     border-radius: 1.25rem 1.25rem 0 0;
     padding: 0 1.75rem 1.75rem;
     backdrop-filter: blur(24px);
@@ -356,7 +356,7 @@
     max-height: 92dvh;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(82, 116, 144, 0.2) transparent;
+    scrollbar-color: var(--accent-primary-dim) transparent;
     animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   @media (min-width: 480px) {
@@ -377,7 +377,7 @@
 
   .handle {
     width: 2.5rem; height: 3px; border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     align-self: center; margin: 1rem 0 0.5rem; flex-shrink: 0;
   }
   @media (min-width: 480px) { .handle { display: none; } }
@@ -393,20 +393,20 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
     letter-spacing: 0.25em;
-    color: #527490;
+    color: var(--accent-primary);
   }
   .close-btn {
     background: none; border: none; padding: 0.25rem;
-    color: rgba(255,255,255,0.3);
+    color: var(--text-muted);
     cursor: pointer; transition: color 0.15s; line-height: 1;
     border-radius: 4px;
   }
-  .close-btn:hover { color: rgba(255,255,255,0.7); }
+  .close-btn:hover { color: var(--text-primary); }
 
   /* ── Tabs ─────────────────────────────────────────────────────────────── */
   .tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid var(--border-subtle);
     margin-bottom: 1.25rem;
     gap: 0;
   }
@@ -416,14 +416,14 @@
     padding: 0.6rem 0;
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem; letter-spacing: 0.18em;
-    color: rgba(255,255,255,0.28);
+    color: var(--text-muted);
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
     transition: color 0.2s, border-color 0.2s;
   }
-  .tab:hover { color: rgba(255,255,255,0.55); }
-  .tab.active { color: #d4d4d8; border-bottom-color: #527490; }
+  .tab:hover { color: var(--text-secondary); }
+  .tab.active { color: var(--text-primary); border-bottom-color: var(--accent-primary); }
 
   /* ── Form ─────────────────────────────────────────────────────────────── */
   .form {
@@ -446,24 +446,24 @@
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
     letter-spacing: 0.15em;
-    color: #527490;
+    color: var(--accent-primary);
   }
   .forgot-link {
     background: none; border: none; padding: 0;
     font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
-    color: rgba(255,255,255,0.25);
+    color: var(--text-muted);
     cursor: pointer;
     transition: color 0.15s;
   }
-  .forgot-link:hover { color: rgba(255,255,255,0.5); }
+  .forgot-link:hover { color: var(--text-secondary); }
 
   .field-input {
     padding: 0.65rem 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-default);
     border-radius: 0.65rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: #f4f4f5;
+    background: var(--surface-well-glass);
+    color: var(--text-primary);
     font-family: 'DM Mono', monospace;
     font-size: 1rem;
     outline: none;
@@ -471,24 +471,24 @@
     width: 100%;
     box-sizing: border-box;
   }
-  .field-input::placeholder { color: rgba(255,255,255,0.18); }
-  .field-input:focus { border-color: rgba(82, 116, 144, 0.45); }
+  .field-input::placeholder { color: var(--text-muted); }
+  .field-input:focus { border-color: var(--border-focus); }
   .field-input:disabled { opacity: 0.5; }
-  .field-input.mismatch { border-color: rgba(196, 112, 112, 0.5); }
+  .field-input.mismatch { border-color: var(--state-error-border); }
   .field-input.code-input { letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.82rem; }
   .field-input.code-input::placeholder { text-transform: none; letter-spacing: 0.04em; }
 
   .field-error {
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
-    color: #c47070;
+    color: var(--state-error);
     margin: 0;
   }
 
   /* ── Password strength ────────────────────────────────────────────────── */
   .strength-bar-wrap {
     height: 3px;
-    background: rgba(255,255,255,0.06);
+    background: var(--surface-well-glass);
     border-radius: 9999px;
     overflow: hidden;
     margin-top: 0.15rem;
@@ -497,10 +497,10 @@
     height: 100%;
     border-radius: 9999px;
     transition: width 0.25s ease, background 0.25s ease;
-    background: #c47070;
+    background: var(--state-error);
   }
-  .strength-bar.level-2 { background: #c4a44e; }
-  .strength-bar.level-3 { background: #5a9e72; }
+  .strength-bar.level-2 { background: var(--state-warning); }
+  .strength-bar.level-3 { background: var(--state-success); }
 
   .strength-criteria {
     list-style: none;
@@ -513,7 +513,7 @@
   .strength-criteria li {
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
-    color: rgba(255,255,255,0.3);
+    color: var(--text-muted);
     padding-left: 1rem;
     position: relative;
     transition: color 0.2s;
@@ -522,67 +522,67 @@
     content: '✗';
     position: absolute;
     left: 0;
-    color: #c47070;
+    color: var(--state-error);
     font-size: 0.6rem;
   }
-  .strength-criteria li.met { color: rgba(255,255,255,0.55); }
-  .strength-criteria li.met::before { content: '✓'; color: #5a9e72; }
+  .strength-criteria li.met { color: var(--text-secondary); }
+  .strength-criteria li.met::before { content: '✓'; color: var(--state-success); }
 
   /* ── Buttons ──────────────────────────────────────────────────────────── */
   .btn-primary {
     padding: 0.8rem;
     border: none; border-radius: 3rem;
-    background: #527490; color: #09090b;
+    background: var(--accent-primary); color: var(--text-on-accent);
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
     cursor: pointer;
     transition: transform 0.12s, filter 0.12s, background 0.2s;
     margin-top: 0.25rem;
   }
-  .btn-primary:hover:not(:disabled) { background: #7d9db6; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-primary-hover); }
   .btn-primary:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.85); }
   .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 
   .btn-secondary {
     padding: 0.7rem;
-    background: rgba(255, 255, 255, 0.06); color: #c2ccd5;
-    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 3rem;
+    background: var(--surface-well-glass); color: var(--text-secondary);
+    border: 1px solid var(--border-default); border-radius: 3rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.7rem; letter-spacing: 0.1em;
     cursor: pointer; text-align: center;
     transition: background 0.2s, color 0.2s;
     width: 100%;
   }
-  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #e4e4e7; }
+  .btn-secondary:hover { background: var(--surface-active); color: var(--text-primary); }
 
   /* ── Misc ─────────────────────────────────────────────────────────────── */
   .error {
     font-family: 'DM Mono', monospace;
-    font-size: 0.82rem; color: #c47070;
+    font-size: 0.82rem; color: var(--state-error);
     margin: 0; letter-spacing: 0.03em;
   }
   .info-msg {
     font-family: 'DM Mono', monospace;
-    font-size: 0.8rem; color: #a4afbb;
+    font-size: 0.8rem; color: var(--text-secondary);
     margin: 0; line-height: 1.5;
     padding: 0.6rem 0.75rem;
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.6rem;
-    background: rgba(255,255,255,0.03);
+    background: var(--surface-hover);
   }
 
   .switch-hint {
     font-family: 'DM Mono', monospace;
-    font-size: 0.78rem; color: rgba(255,255,255,0.22);
+    font-size: 0.78rem; color: var(--text-muted);
     margin: 0; text-align: center;
   }
   .switch-link {
     background: none; border: none; padding: 0;
     font-family: 'DM Mono', monospace;
-    font-size: 0.78rem; color: #527490;
+    font-size: 0.78rem; color: var(--accent-primary);
     cursor: pointer; transition: color 0.15s;
   }
-  .switch-link:hover { color: #7d9db6; }
+  .switch-link:hover { color: var(--accent-primary-hover); }
 
   .pending-state {
     display: flex;
@@ -595,7 +595,7 @@
   .pending-icon { opacity: 0.8; }
   .pending-text {
     font-family: 'DM Mono', monospace;
-    font-size: 0.88rem; color: #8b96a6;
+    font-size: 0.88rem; color: var(--text-secondary);
     line-height: 1.6; margin: 0;
   }
 </style>
