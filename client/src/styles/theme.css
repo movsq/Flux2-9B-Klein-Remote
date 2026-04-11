@@ -48,6 +48,9 @@
   --accent-primary-dim:       rgba(82, 116, 144, 0.15);  /* badge bg, selected fills */
   --accent-primary-glow:      rgba(82, 116, 144, 0.10);  /* ultra-subtle hover fills */
   --accent-primary-border:    rgba(82, 116, 144, 0.30);  /* accent-tinted borders */
+  --accent-primary-fill:        rgba(82, 116, 144, 0.65);  /* filled overlay button bg */
+  --accent-primary-fill-border: rgba(82, 116, 144, 0.55);  /* filled overlay button border */
+  --accent-primary-fill-hover:  rgba(82, 116, 144, 0.88);  /* filled overlay button hover bg */
 
   /* ── Feedback States ────────────────────────────────────────────────────
      Hybrid muted palette — professional and readable without being harsh.

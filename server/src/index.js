@@ -21,7 +21,7 @@ import {
   requireAdmin,
   requireActiveOrCode,
 } from './auth.js'; // authentication & authorization middleware
-import {
+import db, {
   findUserByGoogleSub,
   createUser,
   getUserById,
@@ -96,7 +96,7 @@ const MAX_RESULTS_PER_USER = parseInt(process.env.MAX_RESULTS_PER_USER ?? '500',
 const ACCESS_CODES_ENABLED = process.env.ACCESS_CODES_ENABLED !== 'false';
 // When true (default), ALL new registrations require a valid registration invite code.
 // Set to false only for trusted-network open-registration deployments.
-const INVITE_REQUIRED = process.env.INVITE_REQUIRED === 'true';
+const INVITE_REQUIRED = process.env.INVITE_REQUIRED !== 'false';
 
 // ── Per-user submit rate limiter (persists across reconnects) ─────────────────
 const WS_SUBMIT_WINDOW_MS = 60_000;
@@ -277,9 +277,10 @@ app.use(express.json({ limit: '20mb' }));
 // Rate limiting
 // Auth endpoints: 30 req/min per IP — generous enough for normal interactive login
 // (Google's Sign-In widget can fire multiple XHRs on retry/page-reload) but still
-// blocks automated stuffing. Auth routes are SKIPPED in apiLimiter to avoid
-// double-counting the same request against two buckets.
-const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests — try again later' } });
+// blocks automated stuffing. /auth/register and /auth/login/email use a stricter
+// per-route limiter (emailAuthLimiter) and are excluded from authLimiter so each
+// request only consumes one rate-limit bucket.
+const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, skip: (req) => req.path === '/auth/register' || req.path === '/auth/login/email', message: { error: 'Too many requests — try again later' } });
 const emailAuthLimiter = rateLimit({ windowMs: 60_000, max: 10,  standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests — try again later' } });
 const apiLimiter       = rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false, skip: (req) => req.path.startsWith('/auth/'), message: { error: 'Too many requests — try again later' } });
 app.use('/auth/', authLimiter);
@@ -846,6 +847,9 @@ function validatePassword(pw) {
   if (typeof pw !== 'string' || pw.length < 8) {
     return 'Password must be at least 8 characters';
   }
+  if (pw.length > 1024) {
+    return 'Password must be at most 1024 characters';
+  }
   const hasLetters = PASSWORD_LETTER_RE.test(pw);
   const hasNumbers = PASSWORD_NUMBER_RE.test(pw);
   const hasSymbols = PASSWORD_SYMBOL_RE.test(pw);
@@ -905,15 +909,7 @@ app.post('/auth/register', async (req, res) => {
     return res.status(409).json({ error: 'An account with this email already exists. Try signing in with Google.' });
   }
 
-  // ── Consume invite code ───────────────────────────────────────────────────
-  if (codeRow) {
-    const decrementResult = atomicDecrementCodeUses(codeRow.id);
-    if (decrementResult.changes === 0) {
-      return res.status(400).json({ error: 'Invalid or expired invite code' });
-    }
-  }
-
-  // ── Create user + hash password ───────────────────────────────────────────
+  // ── Hash password (async & expensive — must run before the DB transaction) ──
   const status = codeRow ? 'active' : 'pending';
 
   let passwordHash;
@@ -924,8 +920,27 @@ app.post('/auth/register', async (req, res) => {
     return res.status(500).json({ error: 'Registration failed — please try again' });
   }
 
-  const newUser = createUser({ googleSub: null, email: normalizedEmail, name: '', picture: '', status, isAdmin: false });
-  createEmailAuth(newUser.id, passwordHash);
+  // ── Atomically consume invite code + create user + attach password hash ───
+  // Wrapped in a single transaction so a failure at any step leaves no orphaned
+  // user row and no consumed invite code.
+  let newUser;
+  try {
+    newUser = db.transaction(() => {
+      if (codeRow) {
+        const decrementResult = atomicDecrementCodeUses(codeRow.id);
+        if (decrementResult.changes === 0) {
+          throw Object.assign(new Error('Invalid or expired invite code'), { isKnown400: true });
+        }
+      }
+      const user = createUser({ googleSub: null, email: normalizedEmail, name: '', picture: '', status, isAdmin: false });
+      createEmailAuth(user.id, passwordHash);
+      return user;
+    })();
+  } catch (err) {
+    if (err.isKnown400) return res.status(400).json({ error: err.message });
+    console.error('[auth/register] DB write failed:', err);
+    return res.status(500).json({ error: 'Registration failed — please try again' });
+  }
 
   notifyAdmins('users_changed');
   if (codeRow) notifyAdmins('codes_changed');
@@ -1253,8 +1268,8 @@ async function handlePcSocket(ws) {
     pcSocket = ws;
 
     ws.on('message', handlePcMessage);
-    ws.on('close', () => {
-      console.log('[pc] Disconnected.');
+    ws.on('close', (code, reason) => {
+      console.log(`[pc] Disconnected (code=${code} reason=${reason?.toString() ?? ''}).`);
       if (pcSocket === ws) pcSocket = null;
     });
 

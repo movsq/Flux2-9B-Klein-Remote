@@ -692,8 +692,6 @@
 </div>
 
 <style>
-  @import './styles/theme.css';
-
   :global(*, *::before, *::after) {
     box-sizing: border-box;
   }

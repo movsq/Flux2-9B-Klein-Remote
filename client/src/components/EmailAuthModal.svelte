@@ -101,7 +101,9 @@
       }
     } catch (err) {
       regStep = 'form';
-      regError = err.message;
+      regError = err.message === 'invite_code_required'
+        ? 'An invite code is required to register.'
+        : err.message;
     } finally {
       regLoading = false;
     }

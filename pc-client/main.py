@@ -36,6 +36,13 @@ log = logging.getLogger(__name__)
 
 WS_URL = f"{VPS_URL}/ws/pc"
 
+
+class _ReplacedByNewer(Exception):
+    """Raised when the server sends close(1000, 'Replaced by new connection').
+    Signals that another PC instance has taken over — this process should stop
+    reconnecting rather than cascade-kicking the new instance.
+    """
+
 # Tracks the currently running job so cancel can target it
 _current_job_id: str | None = None
 _current_job_cancelled = asyncio.Event()
@@ -85,6 +92,13 @@ async def run_client() -> None:
         log.info("Waiting for jobs…")
         async for raw in ws:
             await handle_message(ws, raw)
+
+        # Loop exited — log close code/reason so reconnect issues are diagnosable
+        close_code   = getattr(ws, 'close_code',   None)
+        close_reason = getattr(ws, 'close_reason', '') or ''
+        log.info(f"Connection closed cleanly — code={close_code} reason={close_reason!r}")
+        if close_code == 1000 and 'replaced' in close_reason.lower():
+            raise _ReplacedByNewer()
 
 
 async def handle_message(ws, raw: str) -> None:
@@ -201,8 +215,27 @@ async def main() -> None:
     while True:
         try:
             await run_client()
+        except _ReplacedByNewer:
+            log.warning(
+                "This PC instance was closed because another PC client connected to the server. "
+                "If you didn't intentionally start a second instance, check for duplicate processes "
+                "(e.g. two terminals running main.py, or a service manager that didn't stop the old one). "
+                "This process will NOT reconnect so the active instance is not disrupted."
+            )
+            return  # Exit cleanly — the other instance is already running.
         except ConnectionClosed as exc:
-            log.warning(f"Connection closed: {exc}. Reconnecting in {RECONNECT_DELAY}s…")
+            # Also catch the 'replaced' reason when it arrives as an exception
+            # rather than a clean for-loop exit (depends on websockets version).
+            rcvd = getattr(exc, 'rcvd', None)
+            code   = getattr(rcvd, 'code',   None) if rcvd else None
+            reason = (getattr(rcvd, 'reason', '') if rcvd else '') or ''
+            if code == 1000 and 'replaced' in reason.lower():
+                log.warning(
+                    "This PC instance was replaced by another PC client. "
+                    "If unintentional, check for duplicate processes. Not reconnecting."
+                )
+                return
+            log.warning(f"Connection closed: code={code} reason={reason!r}. Reconnecting in {RECONNECT_DELAY}s…")
         except OSError as exc:
             log.warning(f"Connection error: {exc}. Reconnecting in {RECONNECT_DELAY}s…")
         except Exception as exc:

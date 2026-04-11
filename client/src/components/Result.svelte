@@ -1,5 +1,5 @@
 ﻿<script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
   import { encryptBlob, bufToB64 } from '../lib/vault-crypto.js';
   import { saveResult } from '../lib/api.js';
@@ -11,7 +11,7 @@
   let decryptError = $state('');
   let decrypting = $state(true);
   let saving = $state(false);
-  let saved = $state(initialSaved ?? false);
+  let saved = $state(untrack(() => initialSaved ?? false));
   let saveError = $state('');
   let savePending = $state(false); // waiting for vault unlock/setup before saving
   let useInputOpen = $state(false);
@@ -516,13 +516,13 @@
   .overlay-download:active { transform: scale(0.88); }
 
   .overlay-pill-save {
-    background: rgba(82, 116, 144, 0.65);
-    border-color: rgba(82, 116, 144, 0.55);
+    background: var(--accent-primary-fill);
+    border-color: var(--accent-primary-fill-border);
     color: var(--text-primary);
   }
 
   .overlay-pill-save:hover {
-    background: rgba(82, 116, 144, 0.88);
+    background: var(--accent-primary-fill-hover);
     border-color: var(--accent-primary-hover);
     color: var(--text-primary);
   }

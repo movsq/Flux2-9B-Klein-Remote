@@ -177,58 +177,65 @@ if (db.pragma('user_version', { simple: true }) < 8) {
   // - New email_auth table stores argon2id password hashes
   // - New email_login_failures table for per-IP brute-force protection
   // DROP TABLE IF EXISTS guard makes this safe to retry after a mid-migration crash.
-  db.exec(`
-    DROP TABLE IF EXISTS users_v8;
-    CREATE TABLE users_v8 (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      google_sub      TEXT    UNIQUE,
-      email           TEXT    NOT NULL,
-      name            TEXT    NOT NULL DEFAULT '',
-      picture         TEXT    NOT NULL DEFAULT '',
-      status          TEXT    NOT NULL DEFAULT 'pending'
-                              CHECK (status IN ('pending', 'active', 'suspended')),
-      is_admin        INTEGER NOT NULL DEFAULT 0
-                              CHECK (is_admin IN (0, 1)),
-      uses_remaining  INTEGER DEFAULT 0,
-      created_at      INTEGER NOT NULL,
-      updated_at      INTEGER NOT NULL,
-      tos_accepted_at INTEGER DEFAULT NULL,
-      tos_version     INTEGER DEFAULT NULL
-    );
-    INSERT INTO users_v8
-      SELECT id, google_sub, email, name, picture, status, is_admin,
-             uses_remaining, created_at, updated_at, tos_accepted_at, tos_version
-      FROM users;
-    DROP TABLE users;
-    ALTER TABLE users_v8 RENAME TO users;
-
-    CREATE TABLE IF NOT EXISTS email_auth (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id             INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      password_hash       TEXT    NOT NULL,
-      email_verified      INTEGER NOT NULL DEFAULT 0,
-      verification_token  TEXT    DEFAULT NULL,
-      token_expires_at    INTEGER DEFAULT NULL,
-      created_at          INTEGER NOT NULL,
-      updated_at          INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS email_login_failures (
-      ip_address   TEXT    NOT NULL,
-      attempted_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_email_login_failures_ip_at
-      ON email_login_failures(ip_address, attempted_at);
-  `);
-  // Partial unique index: only one email-auth account per email address
-  // (Google users with the same email are separate and allowed to co-exist)
+  // foreign_keys is temporarily disabled so DROP TABLE users does not fail on FK
+  // constraint checks from child tables (invite_codes, vault_keys, stored_results…).
+  db.pragma('foreign_keys = OFF');
   try {
     db.exec(`
-      CREATE UNIQUE INDEX idx_users_email_unique_email_auth
-        ON users(email) WHERE google_sub IS NULL
+      DROP TABLE IF EXISTS users_v8;
+      CREATE TABLE users_v8 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_sub      TEXT    UNIQUE,
+        email           TEXT    NOT NULL,
+        name            TEXT    NOT NULL DEFAULT '',
+        picture         TEXT    NOT NULL DEFAULT '',
+        status          TEXT    NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending', 'active', 'suspended')),
+        is_admin        INTEGER NOT NULL DEFAULT 0
+                                CHECK (is_admin IN (0, 1)),
+        uses_remaining  INTEGER DEFAULT 0,
+        created_at      INTEGER NOT NULL,
+        updated_at      INTEGER NOT NULL,
+        tos_accepted_at INTEGER DEFAULT NULL,
+        tos_version     INTEGER DEFAULT NULL
+      );
+      INSERT INTO users_v8
+        SELECT id, google_sub, email, name, picture, status, is_admin,
+               uses_remaining, created_at, updated_at, tos_accepted_at, tos_version
+        FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_v8 RENAME TO users;
+
+      CREATE TABLE IF NOT EXISTS email_auth (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id             INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        password_hash       TEXT    NOT NULL,
+        email_verified      INTEGER NOT NULL DEFAULT 0,
+        verification_token  TEXT    DEFAULT NULL,
+        token_expires_at    INTEGER DEFAULT NULL,
+        created_at          INTEGER NOT NULL,
+        updated_at          INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS email_login_failures (
+        ip_address   TEXT    NOT NULL,
+        attempted_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_email_login_failures_ip_at
+        ON email_login_failures(ip_address, attempted_at);
     `);
-  } catch { /* already exists on fresh DB */ }
-  db.pragma('user_version = 8');
+    // Partial unique index: only one email-auth account per email address
+    // (Google users with the same email are separate and allowed to co-exist)
+    try {
+      db.exec(`
+        CREATE UNIQUE INDEX idx_users_email_unique_email_auth
+          ON users(email) WHERE google_sub IS NULL
+      `);
+    } catch { /* already exists on fresh DB */ }
+    db.pragma('user_version = 8');
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
 }
 
 if (db.pragma('user_version', { simple: true }) < 9) {

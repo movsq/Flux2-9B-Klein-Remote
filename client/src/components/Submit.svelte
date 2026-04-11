@@ -1798,7 +1798,7 @@
     pointer-events: none;
     border-radius: inherit;
   }
-  .cfg-done:hover { filter: brightness(1.15); border-color: var(--border-focus); }
+  .cfg-done:hover { filter: brightness(1.15); }
   .cfg-done:active { transform: scale(0.97); filter: brightness(0.88); }
 
   /* ── Mobile layout ───────────────────────────────────────────────────── */
