@@ -8,15 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
-RUN echo "=== package.json ===" && cat package.json \
-    && echo "=== installing ===" \
-    && npm install --omit=dev \
-    && echo "=== node_modules/@node-rs ===" \
-    && ls -la node_modules/@node-rs/ 2>/dev/null || true \
-    && echo "=== grep argon ===" \
-    && ls node_modules/ | grep -i argon || true \
-    && test -d node_modules/@node-rs/argon2 \
-    || (echo "ERROR: @node-rs/argon2 not installed" && exit 1)
+RUN npm install --omit=dev \
+    && (test -d node_modules/@node-rs/argon2 \
+    || (echo "ERROR: @node-rs/argon2 not installed" && exit 1))
 
 COPY src/ ./src/
 COPY entrypoint.sh ./

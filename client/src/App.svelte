@@ -22,7 +22,7 @@
   // The ternary dead-code-eliminates to the production value in every real build.
   const _DEV = import.meta.env.DEV;
   let token = $state(_DEV ? 'dev-token' : null);
-  let user  = $state(_DEV ? { name: 'Dev', email: 'dev@local', status: 'approved', isAdmin: false, type: 'code_user', tosAccepted: true } : null);
+  let user  = $state(_DEV ? { name: 'Dev', email: 'dev@local', status: 'active', isAdmin: false, type: 'code_user', tosAccepted: true } : null);
   let ws = $state(null);
   let view = $state(_DEV ? 'submit' : 'login');  // 'login' | 'submit'
   // Result stack — index 0 is frontmost (currently shown), others peek behind it
@@ -75,8 +75,8 @@
   let seedMode = $state('randomize');
 
   // Derived
-  // isGoogleUser: true for account-based users (Google or email/password) — they have a DB identity, vault access, and server-side ToS
-  let isGoogleUser = $derived(user?.type === 'google' || user?.type === 'email');
+  // hasDbUser: true for account-based users (Google or email/password) — they have a DB identity, vault access, and server-side ToS
+  let hasDbUser = $derived(user?.type === 'google' || user?.type === 'email');
 
   // Fetch server feature flags once on mount
   $effect(() => {
@@ -289,8 +289,8 @@
       wsError = 'Reconnect failed. Tap Retry Connection to resume live updates.';
     });
 
-    // Check vault status for Google users
-    if (isGoogleUser) {
+    // Check vault status for account-based users
+    if (hasDbUser) {
       checkVault();
     }
 
@@ -576,9 +576,9 @@
       onNewJob={handleDone}
       isAdmin={user?.isAdmin}
       onOpenAdmin={() => showAdmin = true}
-      showGalleryBtn={isGoogleUser && vaultInfo?.configured}
+      showGalleryBtn={hasDbUser && vaultInfo?.configured}
       onOpenGallery={handleOpenGallery}
-      showVaultSettingsBtn={isGoogleUser && vaultInfo?.configured}
+      showVaultSettingsBtn={hasDbUser && vaultInfo?.configured}
       onOpenVaultSettings={handleOpenVaultSettings}
       {codeUsesRemaining}
       {userUsesRemaining}
@@ -620,7 +620,7 @@
     <Admin {token} onClose={() => showAdmin = false} {accessCodesEnabled} />
   {/if}
 
-  {#if showVaultSetup && isGoogleUser}
+  {#if showVaultSetup && hasDbUser}
     <VaultSetup
       {token}
       userEmail={user?.email ?? ''}

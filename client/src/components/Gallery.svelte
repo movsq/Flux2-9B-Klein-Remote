@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { listResults, getResultFull, deleteResult } from '../lib/api.js';
   import { decryptBlob, b64ToBuf } from '../lib/vault-crypto.js';
 

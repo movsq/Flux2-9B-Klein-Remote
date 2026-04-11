@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { rekeyVault, unlockVault, deleteVault } from '../lib/api.js';
   import {
     exportMasterKey, deriveKeyFromPRF, deriveKeyFromRecovery,

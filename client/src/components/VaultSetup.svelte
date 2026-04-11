@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { setupVault } from '../lib/api.js';
   import {
     generateMasterKey, exportMasterKey,

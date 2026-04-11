@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { registerEmail, loginEmail, acceptTos } from '../lib/api.js';
   import TermsModal from './TermsModal.svelte';
   import DataNoticeModal from './DataNoticeModal.svelte';

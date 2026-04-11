@@ -29,9 +29,9 @@ New accounts start as `pending` **unless** the user supplies a `registration` in
 ### Registration (`POST /auth/register`)
 
 - Requires `email` and `password` in the request body.
-- Password must be at least 12 characters.
-- The password is hashed with **argon2id** (memory: 65 536 KiB, iterations: 3, parallelism: 4) before storage. The plaintext password is never stored or logged.
-- If `INVITE_REQUIRED=true`, a valid `registrationCode` must also be provided — otherwise the request is rejected with `403`.
+- Password must be at least 8 characters.
+- The password is hashed with **argon2id** (memory: 65 536 KiB, iterations: 3, parallelism: 1) before storage. The plaintext password is never stored or logged.
+- If `INVITE_REQUIRED=true`, a valid `inviteCode` must also be provided — otherwise the request is rejected with `400`.
 - On success, returns a JWT with `type: "email"` and the new user object.
 
 ### Login (`POST /auth/login/email`)
@@ -45,13 +45,13 @@ New accounts start as `pending` **unless** the user supplies a `registration` in
 
 | Requirement | Value |
 |-------------|-------|
-| Minimum length | 12 characters |
-| Maximum length | 1 000 characters (enforced server-side) |
-| Complexity | None enforced — length is the primary security factor |
+| Minimum length | 8 characters |
+| Maximum length | 1 024 characters (enforced server-side) |
+| Complexity | Must include at least 2 of: letters, numbers, symbols |
 
 ### Rate limiting
 
-Both `/auth/register` and `/auth/login/email` share a **10 requests per 15-minute window** per IP rate limiter (in addition to the per-endpoint brute-force counters above).
+Both `/auth/register` and `/auth/login/email` share a **10 requests per 1-minute window** per IP rate limiter (in addition to the per-endpoint brute-force counters above).
 
 ---
 

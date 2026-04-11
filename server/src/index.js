@@ -905,8 +905,8 @@ app.post('/auth/register', async (req, res) => {
   const existingAny = findUserByEmail(normalizedEmail);
   if (existingAny) {
     // Surface the same generic message regardless of which auth method was used
-    // to avoid leaking whether a Google account exists with this email.
-    return res.status(409).json({ error: 'An account with this email already exists. Try signing in with Google.' });
+    // to avoid leaking whether an account exists with a specific sign-in method.
+    return res.status(409).json({ error: 'An account with this email already exists. Try signing in.' });
   }
 
   // ── Hash password (async & expensive — must run before the DB transaction) ──

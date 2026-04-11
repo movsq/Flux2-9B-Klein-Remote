@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { onMount } from 'svelte';
   import { generateCode, listCodes, deleteCode, updateCode, listUsers, updateUserStatus, updateUserUses } from '../lib/api.js';
 

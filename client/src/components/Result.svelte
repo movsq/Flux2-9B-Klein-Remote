@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { onDestroy, untrack } from 'svelte';
   import { decodeResultPayload, decryptPayload } from '../lib/crypto.js';
   import { encryptBlob, bufToB64 } from '../lib/vault-crypto.js';
