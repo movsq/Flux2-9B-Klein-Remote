@@ -32,9 +32,9 @@
   // Ticker for countdown displays
   let clockNow = $state(Date.now());
   let wsError = $state('');
-  let wsState = $state(_DEV ? 'connected' : 'disconnected'); // connected | reconnecting | exhausted | connecting | auth_invalid | disconnected
+  let wsState = $state('disconnected'); // connected | reconnecting | exhausted | connecting | auth_invalid | disconnected
   let wsFailedAttempts = $state(0);
-  let wsEverConnected = $state(_DEV ? true : false);
+  let wsEverConnected = $state(false);
   let sessionNotice = $state('');
   let submitInputSetter = null;
   let inputToast = $state('');

@@ -280,7 +280,7 @@ app.use(express.json({ limit: '20mb' }));
 // blocks automated stuffing. /auth/register and /auth/login/email use a stricter
 // per-route limiter (emailAuthLimiter) and are excluded from authLimiter so each
 // request only consumes one rate-limit bucket.
-const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, skip: (req) => req.path === '/auth/register' || req.path === '/auth/login/email', message: { error: 'Too many requests — try again later' } });
+const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, skip: (req) => req.path === '/register' || req.path === '/login/email', message: { error: 'Too many requests — try again later' } });
 const emailAuthLimiter = rateLimit({ windowMs: 60_000, max: 10,  standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests — try again later' } });
 const apiLimiter       = rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false, skip: (req) => req.path.startsWith('/auth/'), message: { error: 'Too many requests — try again later' } });
 app.use('/auth/', authLimiter);
@@ -719,13 +719,21 @@ app.post('/results', requireActive, express.json({ limit: '25mb' }), (req, res) 
     }
   }
 
-  const result = createStoredResult(req.user.userId, {
-    thumb,
-    encryptedFull: fullBuf,
-    ivFull: Buffer.from(ivFull, 'base64'),
-    fullSizeBytes: sanitizedFullSizeBytes,
-    jobId: typeof jobId === 'string' && jobId ? jobId : null,
-  });
+  let result;
+  try {
+    result = createStoredResult(req.user.userId, {
+      thumb,
+      encryptedFull: fullBuf,
+      ivFull: Buffer.from(ivFull, 'base64'),
+      fullSizeBytes: sanitizedFullSizeBytes,
+      jobId: typeof jobId === 'string' && jobId ? jobId : null,
+    });
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) {
+      return res.status(409).json({ error: 'Result already saved' });
+    }
+    throw err;
+  }
 
   res.json(result);
 });
