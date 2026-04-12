@@ -331,7 +331,8 @@
 {#if showGoogleInvitePopup}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
   <div class="google-invite-backdrop" role="dialog" aria-modal="true" tabindex="-1"
-    onclick={(e) => { if (e.target === e.currentTarget) { showGoogleInvitePopup = false; googleInviteCode = ''; googleInviteError = ''; } }}>
+    onclick={(e) => { if (e.target === e.currentTarget) { showGoogleInvitePopup = false; googleInviteCode = ''; googleInviteError = ''; } }}
+    onkeydown={(e) => { if (e.key === 'Escape') { showGoogleInvitePopup = false; googleInviteCode = ''; googleInviteError = ''; } }}>
     <form class="google-invite-card" onsubmit={handleGoogleInviteSubmit} novalidate>
       <p class="google-invite-heading">INVITE REQUIRED</p>
       <p class="google-invite-body">Your Google account isn't registered yet. Enter an invite code to complete registration.</p>

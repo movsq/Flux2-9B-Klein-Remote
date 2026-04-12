@@ -176,12 +176,16 @@ if (db.pragma('user_version', { simple: true }) < 8) {
   // - users.google_sub becomes nullable (email-registered users have no Google sub)
   // - New email_auth table stores argon2id password hashes
   // - New email_login_failures table for per-IP brute-force protection
-  // DROP TABLE IF EXISTS guard makes this safe to retry after a mid-migration crash.
+  // Wrapped in a transaction for atomic execution — a crash between DROP TABLE
+  // and RENAME would otherwise leave the DB without a users table. The
+  // IF EXISTS guard allows the transaction to be safely retried if it committed
+  // but user_version was not yet updated.
   // foreign_keys is temporarily disabled so DROP TABLE users does not fail on FK
   // constraint checks from child tables (invite_codes, vault_keys, stored_results…).
   db.pragma('foreign_keys = OFF');
   try {
     db.exec(`
+      BEGIN;
       DROP TABLE IF EXISTS users_v8;
       CREATE TABLE users_v8 (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,9 +227,12 @@ if (db.pragma('user_version', { simple: true }) < 8) {
       );
       CREATE INDEX IF NOT EXISTS idx_email_login_failures_ip_at
         ON email_login_failures(ip_address, attempted_at);
+      COMMIT;
     `);
-    // Partial unique index: only one email-auth account per email address
-    // (Google users with the same email are separate and allowed to co-exist)
+    // Partial unique index: one non-Google (email-auth) account per email address.
+    // The WHERE google_sub IS NULL clause means Google accounts are not covered by
+    // this constraint, but application-level checks still block cross-method
+    // email duplicates at runtime.
     try {
       db.exec(`
         CREATE UNIQUE INDEX idx_users_email_unique_email_auth

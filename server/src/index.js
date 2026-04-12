@@ -329,7 +329,7 @@ app.post('/auth/google', async (req, res) => {
 
   // ── New user with invite code ─────────────────────────────────────────────
   if (inviteCode) {
-    const code = validateInviteCode(inviteCode, 'registration');
+    const code = validateInviteCode(inviteCode.trim().toUpperCase(), 'registration');
     if (!code) {
       return res.status(400).json({ error: 'Invalid or expired invite code' });
     }
@@ -343,7 +343,7 @@ app.post('/auth/google', async (req, res) => {
     }
     const user = createUser({
       googleSub: googleUser.sub,
-      email: googleUser.email,
+      email: googleUser.email?.toLowerCase(),
       name: googleUser.name,
       picture: googleUser.picture,
       status: 'active',
@@ -376,7 +376,7 @@ app.post('/auth/google', async (req, res) => {
   // Invite not required — create a pending account awaiting admin approval.
   createUser({
     googleSub: googleUser.sub,
-    email: googleUser.email,
+    email: googleUser.email?.toLowerCase(),
     name: googleUser.name,
     picture: googleUser.picture,
     status: 'pending',
