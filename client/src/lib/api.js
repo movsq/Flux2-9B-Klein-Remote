@@ -179,8 +179,10 @@ export async function saveResult(token, data) {
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Save failed: ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.error || `Save failed: ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

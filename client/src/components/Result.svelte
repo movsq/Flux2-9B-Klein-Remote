@@ -134,7 +134,7 @@
         });
       } catch (err) {
         // 409 means this job was already saved — treat as success
-        if (!err.message?.includes('already saved')) throw err;
+        if (err.status !== 409) throw err;
       }
 
       saved = true;

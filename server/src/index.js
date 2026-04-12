@@ -280,7 +280,7 @@ app.use(express.json({ limit: '20mb' }));
 // blocks automated stuffing. /auth/register and /auth/login/email use a stricter
 // per-route limiter (emailAuthLimiter) and are excluded from authLimiter so each
 // request only consumes one rate-limit bucket.
-const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, skip: (req) => req.path === '/register' || req.path === '/login/email', message: { error: 'Too many requests — try again later' } });
+const authLimiter      = rateLimit({ windowMs: 60_000, max: 30,  standardHeaders: true, legacyHeaders: false, skip: (req) => /^\/register\/?$/.test(req.path) || /^\/login\/email\/?$/.test(req.path), message: { error: 'Too many requests — try again later' } });
 const emailAuthLimiter = rateLimit({ windowMs: 60_000, max: 10,  standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests — try again later' } });
 const apiLimiter       = rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false, skip: (req) => req.path.startsWith('/auth/'), message: { error: 'Too many requests — try again later' } });
 app.use('/auth/', authLimiter);
@@ -1757,8 +1757,12 @@ function handleJobSubmit(phoneWs, msg, jwtPayload, queueUserId, wsSessionId, cli
 // ── Admin socket handler ────────────────────────────────────────────────────────────
 function handleAdminSocketPending(ws) {
   const authTimeout = setTimeout(() => ws.close(4001, 'Auth timeout'), 3_000);
+  const cancelTimeout = () => clearTimeout(authTimeout);
+  ws.once('close', cancelTimeout);
+  ws.once('error', cancelTimeout);
   ws.once('message', (raw) => {
-    clearTimeout(authTimeout);
+    cancelTimeout();
+    ws.removeListener('close', cancelTimeout);
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { ws.close(4002, 'Invalid auth'); return; }
     if (msg.type !== 'auth' || typeof msg.token !== 'string') { ws.close(4002, 'Expected auth'); return; }
