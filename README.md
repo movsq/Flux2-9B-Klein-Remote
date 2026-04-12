@@ -61,7 +61,13 @@ Pick the deployment tier that fits your use case:
 
 The server runs on your PC. Open `http://localhost:3000/` in a browser on the same machine.
 
-**For phone, tablet, or remote access** — install [Tailscale](https://tailscale.com/) on your PC and on every device you want to use. Tailscale creates a private encrypted mesh network and provisions real HTTPS certificates via MagicDNS, satisfying the secure context requirement WebCrypto needs. No VPS, no ports forwarded, no firewall rules.
+**For phone, tablet, or remote access** — install [Tailscale](https://tailscale.com/) on your PC and on every device you want to use. Tailscale creates a private encrypted mesh network and gives your PC a stable **MagicDNS hostname** (e.g. `my-pc.tail1234.ts.net`).
+
+> **Why not a LAN IP?** Mobile browsers require a hostname that matches a certificate — raw IPs like `192.168.x.x` can't have trusted certs and will be blocked by the browser's secure-context check. The Tailscale MagicDNS hostname is the right tool here.
+
+**Recommended:** enable **HTTPS Certificates** in the [Tailscale admin console](https://login.tailscale.com/admin/dns). Tailscale then acts as an ACME provider and Caddy auto-provisions a real Let's Encrypt certificate for your hostname. Phone browsers trust it natively — no security warnings, no root CA installation.
+
+**Alternative (no internet/offline Tailnet):** skip HTTPS Certificates and the setup wizard will enable `tls internal` in the Caddyfile instead. Caddy issues a self-signed cert. Desktop browsers can be configured to trust it; mobile browsers will typically warn or block.
 
 → [Local / Tailscale setup guide](SETUP.md)
 

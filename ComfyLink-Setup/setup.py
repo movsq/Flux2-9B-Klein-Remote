@@ -612,32 +612,79 @@ def step_server_config_local() -> tuple[str, int, bool, str, bool, str]:
 
         if ts_host:
             server_host = ts_host
-            enable_tailscale_tls = True
+
+            console.print()
             console.print(Panel(
                 Text.assemble(
-                    ("Tailscale Setup Steps\n\n", "bold"),
-                    ("1. ", "bold cyan"),
-                    ("In the Tailscale admin console (login.tailscale.com/admin/dns)\n"
-                     "   enable ", ""),
-                    ("MagicDNS", "bold"),
-                    (" and ", ""),
+                    ("Tailscale TLS — two options\n\n", "bold yellow"),
+                    ("Recommended: ", "bold green"),
+                    ("Enable ", ""),
                     ("HTTPS Certificates", "bold"),
-                    (".\n\n", ""),
-                    ("2. ", "bold cyan"),
-                    ("Install Tailscale on this PC if not already running:\n"
-                     "   https://tailscale.com/download\n\n", ""),
-                    ("3. ", "bold cyan"),
-                    ("Install Tailscale on every phone or tablet you want to use.\n\n", ""),
-                    ("4. ", "bold cyan"),
-                    ("On each device: open the Tailscale app and connect to your network.\n\n", ""),
-                    ("5. ", "bold cyan"),
-                    (f"Open  https://{ts_host}  in your browser.\n", ""),
-                    ("   (Only reachable while connected to your Tailscale network)", "dim"),
+                    (" in the Tailscale admin console\n"
+                     "   (login.tailscale.com/admin/dns → same page as MagicDNS).\n"
+                     "   Tailscale acts as ACME provider → Caddy gets a real Let's Encrypt cert.\n"
+                     "   Phone browsers trust it natively. No root CA installation needed.\n\n", ""),
+                    ("Alternative: ", "bold yellow"),
+                    ("Skip HTTPS Certificates → wizard enables ", ""),
+                    ("tls internal", "bold"),
+                    (" in the Caddyfile.\n"
+                     "   Caddy uses its own self-signed CA. Desktop OK; mobile browsers\n"
+                     "   will usually show a certificate warning or block the connection.", ""),
                 ),
-                title="[bold]Tailscale \u2014 phone / remote access[/bold]",
-                border_style="cyan",
+                border_style="yellow",
                 padding=(1, 2),
             ))
+            console.print()
+
+            https_certs_enabled = q_confirm(
+                "Have you enabled HTTPS Certificates in the Tailscale admin console?  [Enter = Yes]",
+                default=True,
+            )
+            console.print()
+
+            # tls internal is only needed when Tailscale is NOT providing a cert
+            enable_tailscale_tls = not https_certs_enabled
+
+            if https_certs_enabled:
+                console.print(Panel(
+                    Text.assemble(
+                        ("Tailscale HTTPS Certificates — enabled\n\n", "bold green"),
+                        ("Caddy will auto-provision a real Let's Encrypt certificate\n"
+                         "for ", ""),
+                        (ts_host, "bold cyan"),
+                        (" via Tailscale. No tls internal needed.\n\n", ""),
+                        ("Install Tailscale on every phone you want to use:\n", "bold"),
+                        ("  https://tailscale.com/download\n\n", "cyan"),
+                        ("Then open  ", ""),
+                        (f"https://{ts_host}", "bold cyan"),
+                        ("  in your browser.\n", ""),
+                        ("(Only reachable while connected to your Tailscale network)", "dim"),
+                    ),
+                    title="[bold]Tailscale \u2014 phone / remote access[/bold]",
+                    border_style="green",
+                    padding=(1, 2),
+                ))
+            else:
+                console.print(Panel(
+                    Text.assemble(
+                        ("Tailscale tls internal — self-signed cert\n\n", "bold yellow"),
+                        ("The Caddyfile will be patched with ", ""),
+                        ("tls internal", "bold"),
+                        (" (Caddy's built-in CA).\n\n", ""),
+                        ("\u26a0\ufe0f  Most mobile browsers will show a certificate warning\n"
+                         "   or refuse to connect. For phone / tablet access,\n"
+                         "   enabling Tailscale HTTPS Certificates is strongly recommended.\n\n", "yellow"),
+                        ("Install Tailscale on every phone you want to use:\n", "bold"),
+                        ("  https://tailscale.com/download\n\n", "cyan"),
+                        ("Then open  ", ""),
+                        (f"https://{ts_host}", "bold cyan"),
+                        ("  in your browser.\n", ""),
+                        ("(Only reachable while connected to your Tailscale network)", "dim"),
+                    ),
+                    title="[bold]Tailscale \u2014 tls internal[/bold]",
+                    border_style="yellow",
+                    padding=(1, 2),
+                ))
             console.print()
         else:
             console.print("[yellow]![/yellow] No hostname entered \u2014 falling back to localhost only.\n")
