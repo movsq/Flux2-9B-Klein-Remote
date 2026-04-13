@@ -2,9 +2,19 @@
 #
 # FLUX_KLEIN_HOST is injected as an environment variable by docker-compose.
 # Examples:
-#   Tailscale MagicDNS:  flux2-klein.tailXXXXX.ts.net   → add "tls internal" below
-#   Custom domain:       flux2-klein.example.com        → Caddy auto-provisions Let's Encrypt
-#   Raw LAN IP:          192.168.1.100                  → add "tls internal" below
+#   Tailscale MagicDNS (HTTPS Certs ON):  my-pc.tail1234.ts.net  → leave tls internal commented
+#                                           Tailscale acts as ACME provider; Caddy auto-provisions
+#                                           a real Let's Encrypt cert. Phone browsers trust it natively.
+#   Tailscale MagicDNS (HTTPS Certs OFF): my-pc.tail1234.ts.net  → uncomment "tls internal"
+#                                           Caddy uses its own self-signed CA. Works on desktop;
+#                                           phone/mobile browsers will warn or block.
+#   Custom domain:                          flux2-klein.example.com → leave tls internal commented
+#                                           Caddy auto-provisions a public Let's Encrypt cert.
+#
+# ⚠  Raw LAN IPs (192.168.x.x) are NOT supported for phone/remote access.
+#    Mobile browsers require a hostname that matches a certificate; raw IPs
+#    cannot have trusted TLS certs and will fail the WebCrypto secure context check.
+#    Use a Tailscale MagicDNS hostname instead.
 
 # ── Cloudflare trusted proxies (global options) ────────────────────────────────
 # Enabled by default — it is a no-op when traffic does NOT come through Cloudflare
@@ -22,7 +32,9 @@
 }
 
 {$FLUX_KLEIN_HOST:localhost} {
-    # ── Uncomment for Tailscale or other private-CA networks ──────────────────
+    # ── TLS: only needed when Tailscale HTTPS Certificates are NOT enabled ──────
+    # Tailscale HTTPS Certs ON  → leave commented (Caddy auto-provisions via Tailscale ACME)
+    # Tailscale HTTPS Certs OFF → uncomment for Caddy's self-signed CA (desktop OK; mobile may warn)
     # tls internal
 
     # ── Security headers ──────────────────────────────────────────────────────
